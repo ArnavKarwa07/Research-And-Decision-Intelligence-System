@@ -3,6 +3,8 @@ import Sidebar from './components/Sidebar';
 import QueryInput from './components/QueryInput';
 import ResearchProgress from './components/ResearchProgress';
 import EvidenceCard from './components/EvidenceCard';
+import PlanGraphView from './components/PlanGraphView';
+import DecisionMatrixCard from './components/DecisionMatrixCard';
 import EmptyHeroState from './components/EmptyHeroState';
 import TerminalLogsModal from './components/TerminalLogsModal';
 import { api } from './lib/api';
@@ -20,6 +22,8 @@ export default function App() {
   const [isResearching, setIsResearching] = useState(false);
   const [steps, setSteps] = useState([]);
   const [evidence, setEvidence] = useState([]);
+  const [plan, setPlan] = useState([]);
+  const [decisionMatrix, setDecisionMatrix] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
   const [showLogsModal, setShowLogsModal] = useState(false);
   
@@ -29,6 +33,8 @@ export default function App() {
   const resetWorkspace = useCallback(() => {
     setSteps([]);
     setEvidence([]);
+    setPlan([]);
+    setDecisionMatrix(null);
     setIsResearching(false);
     setCurrentQuery(null);
     setErrorMsg(null);
@@ -123,6 +129,12 @@ export default function App() {
           setSteps(prev => prev.map(p => p.status === 'running' ? { ...p, status: 'completed' } : p));
           if (resultData.data?.evidence) {
             setEvidence(resultData.data.evidence);
+          }
+          if (resultData.data?.plan) {
+            setPlan(resultData.data.plan);
+          }
+          if (resultData.data?.decision_matrix) {
+            setDecisionMatrix(resultData.data.decision_matrix);
           }
           if (streamCleanupRef.current) streamCleanupRef.current();
           streamCleanupRef.current = null;
@@ -238,6 +250,12 @@ export default function App() {
               <div className="flex-1 flex flex-col w-full">
                 {/* Inline Telemetry Stream */}
                 <ResearchProgress steps={steps} isActive={isResearching} />
+
+                {/* Plan Dependency Graph */}
+                <PlanGraphView plan={plan} activeAgent={steps[steps.length - 1]?.agentType} />
+
+                {/* Executive Decision Matrix */}
+                <DecisionMatrixCard decisionMatrix={decisionMatrix} confidence={currentQuery?.confidence} />
 
                 {/* Verified Findings & Evidence */}
                 {evidence.length > 0 && (

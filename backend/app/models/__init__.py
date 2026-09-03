@@ -4,6 +4,7 @@ from .session import Session
 from .query import Query
 from .evidence import Evidence
 from .source import Source
+from .agent_run import AgentRun
 
 __all__ = [
     "Base",
@@ -11,4 +12,5 @@ __all__ = [
     "Query",
     "Evidence",
     "Source",
+    "AgentRun",
 ]

@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Optional
 if TYPE_CHECKING:
     from app.models.session import Session
     from app.models.evidence import Evidence
+    from app.models.agent_run import AgentRun
 
 class Query(TimestampMixin, Base):
     """Database model for a user query."""
@@ -40,6 +41,11 @@ class Query(TimestampMixin, Base):
     )
     evidence_list: Mapped[list["Evidence"]] = relationship(
         "Evidence",
+        back_populates="query",
+        cascade="all, delete-orphan"
+    )
+    agent_runs: Mapped[list["AgentRun"]] = relationship(
+        "AgentRun",
         back_populates="query",
         cascade="all, delete-orphan"
     )

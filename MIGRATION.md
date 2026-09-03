@@ -27,22 +27,22 @@ To initialize the database locally and apply the first migration:
 
 Phase 1 established the core multi-agent framework, robust tool safety mechanisms, and the real-time SSE-driven UI. Phase 2 will focus on persistence, advanced reasoning capabilities, and scalable infrastructure.
 
-### Anticipated Database Schema Changes (Phase 2)
+## Phase 2 Implemented Schema Additions
 
-As we move into Phase 2, the following schema migrations will be necessary:
+Phase 2 adds durable agent state persistence and multi-agent plan storage to the database:
 
-1. **User Accounts & Authentication:**
-   - Introduction of `User` models.
-   - Foreign key relations linking `Session` to `User`.
-2. **Agent State Persistence:**
-   - Transitioning the in-memory message bus to a durable queue (e.g., Redis, RabbitMQ).
-   - Adding an `AgentStateLog` table to persist intermediate reasoning steps, allowing paused or interrupted queries to be resumed.
-3. **Feedback Loops:**
-   - Adding `UserFeedback` tables to link user ratings/corrections directly to specific `Evidence` or `Query` rows for fine-tuning future agent behaviors.
+1. **`AgentRun` Table (`agent_runs`):**
+   - Stores sub-agent execution runs linked via `query_id` foreign key (`queries.id`).
+   - Fields: `id` (UUID), `query_id` (FK), `agent_type` (String), `status` (String), `steps_taken` (Integer), `tokens_used` (Integer), `elapsed_seconds` (Float), `error` (Text), `execution_log` (JSON).
+2. **`Query` Table JSON Extensions (`queries.research_plan`):**
+   - Stores the structured sub-task plan array, `decision_matrix`, `audit_passed` flag, and `audit_issues` array directly in `research_plan`.
 
-### Breaking Changes & Migration Steps
+### Migration Execution
 
-- **Data Serialization:** Transitioning from lightweight Phase 1 Pydantic schemas to strictly versioned API contracts may require data backfills or schema translations for existing `Session` and `Evidence` data.
-- **Message Bus:** Shifting from the Phase 1 in-memory bus to a durable backend will require updating the BaseAgent and SSE streaming endpoints to subscribe to external message brokers. No existing data migration is strictly necessary for this, but runtime infrastructure changes are required.
+To apply the Phase 2 schema migrations to local SQLite/PostgreSQL:
 
-Always test migrations against a staging clone of the database before applying `alembic upgrade head` in production.
+```bash
+cd backend
+alembic revision --autogenerate -m "Add agent_runs table and query research_plan json"
+alembic upgrade head
+```

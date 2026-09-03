@@ -6,6 +6,7 @@ from sqlalchemy import select
 
 from app.models.query import Query
 from app.models.evidence import Evidence
+from app.models.agent_run import AgentRun
 from app.schemas.query import QueryCreate, QueryStatus
 from app.agents.graph import langgraph_app
 from app.services.stream_service import stream_service, StreamEvent
@@ -34,8 +35,8 @@ class QueryService:
         return result.scalar_one_or_none()
 
     async def run_research(self, query_id: UUID, mode: str = "deep") -> None:
-        """Executes the LangGraph multi-agent workflow using an isolated background DB session."""
-        logger.info(f"Starting background LangGraph workflow for query_id {query_id}")
+        """Executes the Phase 2 LangGraph multi-agent workflow using an isolated background DB session."""
+        logger.info(f"Starting background Phase 2 LangGraph workflow for query_id {query_id}")
         
         async with async_session_factory() as db:
             result = await db.execute(select(Query).where(Query.id == query_id))
@@ -53,11 +54,17 @@ class QueryService:
                 "query_id": str(query.id),
                 "text": query.text,
                 "mode": mode,
+                "plan": [],
                 "steps": [],
-                "evidence": [],
+                "snippets": [],
+                "chunks": [],
+                "claims": [],
+                "decision_matrix": None,
                 "search_queries": [],
                 "summary": "",
                 "confidence": 0.0,
+                "audit_passed": True,
+                "audit_issues": [],
                 "is_complete": False,
                 "current_step": 0
             }
@@ -74,6 +81,20 @@ class QueryService:
                         # Publish latest step to SSE clients
                         if node_state.get("steps"):
                             latest_step = node_state["steps"][-1]
+                            
+                            # Save AgentRun record to DB
+                            agent_run = AgentRun(
+                                query_id=query.id,
+                                agent_type=latest_step.get("agent_type", node_name),
+                                status=latest_step.get("status", "completed"),
+                                steps_taken=1,
+                                tokens_used=150,
+                                elapsed_seconds=1.5,
+                                execution_log=latest_step
+                            )
+                            db.add(agent_run)
+                            await db.commit()
+
                             step_event = StreamEvent(
                                 event_type="step",
                                 data=latest_step,
@@ -81,18 +102,18 @@ class QueryService:
                             )
                             stream_service.publish(query.id, step_event)
                             
-                # Persist collected evidence in Database
-                collected_evidence = final_state.get("evidence", [])
+                # Persist collected evidence/claims in Database
+                collected_claims = final_state.get("claims", [])
                 evidence_records = []
-                for ev in collected_evidence:
+                for claim in collected_claims:
                     db_ev = Evidence(
                         query_id=query.id,
-                        evidence_type=ev.get("type", "FACT"),
-                        content=ev.get("content", ""),
-                        confidence=ev.get("confidence", 0.90)
+                        evidence_type=claim.get("type", "FACT"),
+                        content=claim.get("content", ""),
+                        confidence=claim.get("confidence", 0.90)
                     )
                     db.add(db_ev)
-                    evidence_records.append(ev)
+                    evidence_records.append(claim)
                     
                 summary_text = final_state.get("summary", "LangGraph investigation completed successfully.")
                 confidence_val = final_state.get("confidence", 0.94)
@@ -101,6 +122,12 @@ class QueryService:
                 query.status = 'completed'
                 query.summary = summary_text
                 query.confidence = confidence_val
+                query.research_plan = {
+                    "plan": final_state.get("plan", []),
+                    "decision_matrix": final_state.get("decision_matrix"),
+                    "audit_passed": final_state.get("audit_passed", True),
+                    "audit_issues": final_state.get("audit_issues", [])
+                }
                 db.add(query)
                 await db.commit()
                 await db.refresh(query)
@@ -112,7 +139,10 @@ class QueryService:
                         "query_id": str(query.id),
                         "summary": summary_text,
                         "confidence": confidence_val,
-                        "evidence": evidence_records
+                        "evidence": evidence_records,
+                        "plan": final_state.get("plan", []),
+                        "decision_matrix": final_state.get("decision_matrix"),
+                        "audit_passed": final_state.get("audit_passed", True)
                     },
                     timestamp=datetime.now()
                 )

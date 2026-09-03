@@ -8,7 +8,7 @@ async def test_end_to_end():
     async with httpx.AsyncClient(timeout=60.0) as client:
         # 1. Create Session
         print("1. Creating session...")
-        res = await client.post(f"{BASE_URL}/sessions/", json={"title": "End-to-End LangGraph Test"})
+        res = await client.post(f"{BASE_URL}/sessions/", json={"title": "End-to-End Multi-Agent Test"})
         assert res.status_code == 201, f"Failed session creation: {res.text}"
         session_id = res.json()["id"]
         print(f"   Session created: {session_id}")
@@ -16,7 +16,7 @@ async def test_end_to_end():
         # 2. Submitting Query
         print("2. Submitting investigation query...")
         query_payload = {
-            "text": "Analyze Q3 semiconductor supply chain risks and export controls",
+            "text": "Analyze semiconductor supply chain risks and export controls",
             "mode": "deep"
         }
         res = await client.post(f"{BASE_URL}/sessions/{session_id}/queries/", json=query_payload)
@@ -46,6 +46,7 @@ async def test_end_to_end():
                         elif event_type == "complete":
                             print(f"   [SSE COMPLETE] Summary: {event_data.get('summary')}")
                             print(f"   [SSE COMPLETE] Evidence Items: {len(event_data.get('evidence', []))}")
+                            print(f"   [SSE COMPLETE] Sub-tasks Plan: {len(event_data.get('plan', []))}")
                             break
                         elif event_type == "error":
                             print(f"   [SSE ERROR] {event_data.get('message')}")
@@ -53,21 +54,29 @@ async def test_end_to_end():
                     except Exception as e:
                         print(f"   [PARSE ERROR] {e}")
 
-        # 4. Verify Database Record
+        # 4. Verify Database Record (Wait for background completion if needed)
         print("4. Verifying database state...")
-        await asyncio.sleep(2.0)
-        res = await client.get(f"{BASE_URL}/sessions/{session_id}/queries/{query_id}")
-        assert res.status_code == 200
-        query_data = res.json()
-        print(f"   Final Query Status: {query_data['status']}")
-        print(f"   Final Summary: {query_data['summary']}")
-        print(f"   Final Confidence: {query_data['confidence']}")
+        query_data = {}
+        for _ in range(10):
+            res = await client.get(f"{BASE_URL}/sessions/{session_id}/queries/{query_id}")
+            assert res.status_code == 200
+            query_data = res.json()
+            if query_data.get("status") == "completed":
+                break
+            await asyncio.sleep(1.0)
+
+        print(f"   Final Query Status: {query_data.get('status')}")
+        print(f"   Final Summary: {query_data.get('summary')}")
+        print(f"   Final Confidence: {query_data.get('confidence')}")
+        assert query_data.get("status") == "completed", "Query failed to reach completed status"
 
         # 5. Verify Evidence Record
         res = await client.get(f"{BASE_URL}/queries/{query_id}/evidence")
         assert res.status_code == 200
         evidence_list = res.json()
         print(f"   Fetched DB Evidence Count: {len(evidence_list)}")
+        assert len(evidence_list) > 0, "No evidence items persisted in DB"
+        print("[SUCCESS] End-to-end multi-agent execution test passed cleanly!")
 
 if __name__ == "__main__":
     asyncio.run(test_end_to_end())
