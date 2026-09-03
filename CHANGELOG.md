@@ -5,6 +5,21 @@ All notable changes to the Research And Decision Intelligence System (RADIS) wil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.0] - 2026-09-03
+
+### Added (Phase 3 Evidence Intelligence)
+- Atomic claim extraction & typing (7-type taxonomy)
+- Source credibility, freshness, and independence scoring services
+- Claim confidence engine with weighted formulas
+- Fact Check Agent with 3 search strategies (Direct, Authority, Counter-evidence) and strict URL/content_hash deduplication
+- Contradiction Agent with 5-check detection pipeline, severity scoring, and resolution state machine
+- Provenance Agent & Evidence Graph engine
+- Extended LangGraph workflow with conditional re-verification loops
+- 9 new SSE event types (`claim:*`, `contradiction:*`, `source:*`, `evidence:graph_updated`)
+- New API endpoints for claims, contradictions, evidence-graph, and user resolutions
+- 6 new Frontend UI components (`ClaimsPanel`, `ContradictionsPanel`, `EvidenceGraphView`, `SourceScoringCard`, `UserResolutionModal`, SSE hook extensions)
+- Database schema additions (`claims`, `claim_sources`, `source_groups`, `source_group_members`, `contradictions`, `sources` extensions)
+
 ## [2.0.0] - Phase 2 Release - 2026-09-03
 
 ### Added

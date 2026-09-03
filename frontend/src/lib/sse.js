@@ -35,6 +35,23 @@ export function connectToStream(queryId, handlers) {
     }
   });
 
+  const phase3Events = [
+    'claim:extracted', 'claim:verified', 'claim:disputed',
+    'contradiction:detected', 'contradiction:resolved',
+    'source:scored', 'evidence:graph_updated'
+  ];
+
+  phase3Events.forEach(eventType => {
+    eventSource.addEventListener(eventType, (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (handlers.onPhase3Event) handlers.onPhase3Event(eventType, data);
+      } catch (e) {
+        console.error(e);
+      }
+    });
+  });
+
   eventSource.onerror = (err) => {
     if (handlers.onError) handlers.onError(err);
     eventSource.close();

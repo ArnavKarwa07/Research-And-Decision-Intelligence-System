@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from app.models.evidence import Evidence
+    from app.models.claim_source import ClaimSource
 
 class Source(TimestampMixin, Base):
     """Database model for a retrieved source."""
@@ -32,7 +33,21 @@ class Source(TimestampMixin, Base):
         nullable=False
     )
     
+    # New Phase 3 Evidence Intelligence fields
+    publisher: Mapped[str | None] = mapped_column(String, nullable=True)
+    source_type: Mapped[str | None] = mapped_column(String, nullable=True)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    content_hash: Mapped[str | None] = mapped_column(String, nullable=True)
+    independence_group: Mapped[str | None] = mapped_column(String, nullable=True)
+    freshness_category: Mapped[str | None] = mapped_column(String, nullable=True)
+    
     evidence_list: Mapped[list["Evidence"]] = relationship(
         "Evidence",
         back_populates="source"
+    )
+    
+    claim_sources: Mapped[list["ClaimSource"]] = relationship(
+        "ClaimSource",
+        back_populates="source",
+        cascade="all, delete-orphan"
     )

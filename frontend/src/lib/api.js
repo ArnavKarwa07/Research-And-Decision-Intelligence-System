@@ -39,4 +39,9 @@ export const api = {
   getQuery: (queryId) => fetchApi(`/queries/${queryId}`),
 
   getEvidence: (queryId) => fetchApi(`/queries/${queryId}/evidence`),
+  
+  resolveContradiction: (id, resolutionData) => fetchApi(`/contradictions/${id}/resolve`, {
+    method: 'POST',
+    body: JSON.stringify(resolutionData),
+  }),
 };

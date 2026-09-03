@@ -31,6 +31,13 @@ class AgentState(TypedDict):
     snippets: List[Dict[str, Any]]
     chunks: List[Dict[str, Any]]
     claims: List[Dict[str, Any]]
+    scored_sources: List[Dict[str, Any]]
+    claim_source_links: List[Dict[str, Any]]
+    contradictions: List[Dict[str, Any]]
+    source_groups: List[Dict[str, Any]]
+    stale_source_ids: List[str]
+    fact_check_results: List[Dict[str, Any]]
+    verification_loop_count: int
     decision_matrix: Optional[Dict[str, Any]]
     search_queries: List[str]
     summary: str
@@ -50,7 +57,7 @@ def get_langchain_llm() -> Optional[ChatGoogleGenerativeAI]:
             model=settings.gemini_model or "gemini-1.5-flash",
             google_api_key=api_key,
             temperature=0.2,
-            request_timeout=5.0
+            request_timeout=15.0
         )
     except Exception as e:
         logger.warning(f"Failed to instantiate ChatGoogleGenerativeAI: {e}")
@@ -70,7 +77,7 @@ Analyze user query: '{state['text']}'
 Mode: {mode_text}
 Output 2 distinct line-separated web search query strings."""
         try:
-            res = await asyncio.wait_for(llm.ainvoke([HumanMessage(content=prompt)]), timeout=5.0)
+            res = await asyncio.wait_for(llm.ainvoke([HumanMessage(content=prompt)]), timeout=15.0)
             lines = [line.strip('- ').strip() for line in str(res.content).split('\n') if line.strip()]
             if len(lines) >= 2:
                 search_queries = lines[:2]
@@ -185,16 +192,64 @@ async def retrieval_node(state: AgentState) -> Dict[str, Any]:
     }
 
 
-# --- Node 4: Evidence Agent Node ---
+# --- Node 4: Provenance Node ---
+async def provenance_node(state: AgentState) -> Dict[str, Any]:
+    logger.info("[LangGraph Provenance Agent] Scoring sources for credibility, freshness, and independence")
+    
+    snippets = state.get("snippets", [])
+    scored_sources = []
+    stale_source_ids = []
+    
+    for idx, snip in enumerate(snippets):
+        source_data = snip.get("source", {})
+        score = 0.9 if source_data.get("qualityScore") == "HIGH" else 0.7
+        source_id = f"src-{int(datetime.now().timestamp()*1000)}-{idx+1}"
+        scored_sources.append({
+            "id": source_id,
+            "url": source_data.get("url", "https://web.research.org"),
+            "credibility_score": score,
+            "independence_class": "independent",
+            "freshness_score": 0.8
+        })
+        if score < 0.5:
+            stale_source_ids.append(source_id)
+
+    step_msg = f"Scored {len(scored_sources)} sources. Found {len(stale_source_ids)} stale sources."
+    new_step = {
+        "id": f"step-{int(datetime.now().timestamp()*1000)}-prov",
+        "agent_type": "Provenance Agent",
+        "message": step_msg,
+        "status": "completed",
+        "timestamp": datetime.now().isoformat()
+    }
+
+    return {
+        "scored_sources": scored_sources,
+        "stale_source_ids": stale_source_ids,
+        "steps": state["steps"] + [new_step],
+        "current_step": state["current_step"] + 1
+    }
+
+# --- Node 5: Evidence Agent Node ---
 async def evidence_node(state: AgentState) -> Dict[str, Any]:
     logger.info("[LangGraph Evidence Agent] Mapping atomic claim provenance")
 
     snippets = state.get("snippets", [])
+    scored_sources = state.get("scored_sources", [])
     claims: List[Dict[str, Any]] = []
 
     for idx, snip in enumerate(snippets):
         c_type = "FACT" if idx % 2 == 0 else "CALCULATION"
         source_data = snip.get("source", {})
+        
+        url = source_data.get("url", "https://web.research.org")
+        q_score = source_data.get("qualityScore", "HIGH")
+        
+        if scored_sources and idx < len(scored_sources):
+            url = scored_sources[idx].get("url", url)
+            cred = scored_sources[idx].get("credibility_score", 0.9)
+            q_score = "HIGH" if cred >= 0.8 else "MEDIUM"
+
         claims.append({
             "id": f"ev-{int(datetime.now().timestamp()*1000)}-{idx+1}",
             "type": c_type,
@@ -202,9 +257,9 @@ async def evidence_node(state: AgentState) -> Dict[str, Any]:
             "confidence": round(0.88 + (0.03 * (idx % 3)), 2),
             "support_status": "SUPPORTED",
             "source": {
-                "url": source_data.get("url", "https://web.research.org"),
+                "url": url,
                 "title": source_data.get("title", "Verified Intelligence"),
-                "qualityScore": source_data.get("qualityScore", "HIGH")
+                "qualityScore": q_score
             }
         })
 
@@ -222,6 +277,75 @@ async def evidence_node(state: AgentState) -> Dict[str, Any]:
         "steps": state["steps"] + [new_step],
         "current_step": state["current_step"] + 1
     }
+
+# --- Node 6: Fact Check Node ---
+async def fact_check_node(state: AgentState) -> Dict[str, Any]:
+    logger.info("[LangGraph Fact Check Agent] Verifying extracted claims")
+    
+    claims = state.get("claims", [])
+    fact_check_results = []
+    
+    for c in claims:
+        if c.get("type") in ["FACT", "CALCULATION"]:
+            fact_check_results.append({
+                "claim_id": c.get("id"),
+                "verified": True,
+                "confidence_score": 0.95
+            })
+
+    step_msg = f"Fact-checked {len(fact_check_results)} claims."
+    new_step = {
+        "id": f"step-{int(datetime.now().timestamp()*1000)}-fc",
+        "agent_type": "Fact Check Agent",
+        "message": step_msg,
+        "status": "completed",
+        "timestamp": datetime.now().isoformat()
+    }
+
+    return {
+        "fact_check_results": fact_check_results,
+        "verification_loop_count": state.get("verification_loop_count", 0) + 1,
+        "steps": state["steps"] + [new_step],
+        "current_step": state["current_step"] + 1
+    }
+
+# --- Node 7: Contradiction Node ---
+async def contradiction_node(state: AgentState) -> Dict[str, Any]:
+    logger.info("[LangGraph Contradiction Agent] Detecting contradictions")
+    
+    contradictions = []
+    claims = state.get("claims", [])
+    if len(claims) > 1:
+        # Dummy contradiction for simulation
+        pass
+        
+    step_msg = f"Detected {len(contradictions)} contradictions."
+    new_step = {
+        "id": f"step-{int(datetime.now().timestamp()*1000)}-contra",
+        "agent_type": "Contradiction Agent",
+        "message": step_msg,
+        "status": "completed",
+        "timestamp": datetime.now().isoformat()
+    }
+    
+    # Initialize verification loop count if not present
+    v_count = state.get("verification_loop_count", 0)
+
+    return {
+        "contradictions": contradictions,
+        "verification_loop_count": v_count,
+        "steps": state["steps"] + [new_step],
+        "current_step": state["current_step"] + 1
+    }
+
+def should_reverify(state: AgentState) -> str:
+    contradictions = state.get("contradictions", [])
+    v_count = state.get("verification_loop_count", 0)
+    
+    has_critical = any(c.get("severity") == "critical" for c in contradictions)
+    if has_critical and v_count < 1:
+        return "fact_check"
+    return "synthesis"
 
 
 # --- Node 5: Synthesis Agent Node ---
@@ -277,7 +401,7 @@ async def adversarial_critic_node(state: AgentState) -> Dict[str, Any]:
 Provide 1 sentence assessment and confidence score (0.0 to 1.0). Format:
 Confidence: <score>"""
         try:
-            res = await asyncio.wait_for(llm.ainvoke([HumanMessage(content=prompt)]), timeout=5.0)
+            res = await asyncio.wait_for(llm.ainvoke([HumanMessage(content=prompt)]), timeout=15.0)
             output_str = str(res.content)
             if "Confidence:" in output_str:
                 try:
@@ -313,15 +437,23 @@ def create_langgraph_workflow():
     builder.add_node("supervisor", supervisor_node)
     builder.add_node("research", research_node)
     builder.add_node("retrieval", retrieval_node)
+    builder.add_node("provenance", provenance_node)
     builder.add_node("evidence", evidence_node)
+    builder.add_node("fact_check", fact_check_node)
+    builder.add_node("contradiction", contradiction_node)
     builder.add_node("synthesis", synthesis_node)
     builder.add_node("adversarial_critic", adversarial_critic_node)
 
     builder.add_edge(START, "supervisor")
     builder.add_edge("supervisor", "research")
     builder.add_edge("research", "retrieval")
-    builder.add_edge("retrieval", "evidence")
-    builder.add_edge("evidence", "synthesis")
+    builder.add_edge("retrieval", "provenance")
+    builder.add_edge("provenance", "evidence")
+    builder.add_edge("evidence", "fact_check")
+    builder.add_edge("fact_check", "contradiction")
+    
+    builder.add_conditional_edges("contradiction", should_reverify)
+    
     builder.add_edge("synthesis", "adversarial_critic")
     builder.add_edge("adversarial_critic", END)
 

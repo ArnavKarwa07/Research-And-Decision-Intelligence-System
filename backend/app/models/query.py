@@ -11,6 +11,9 @@ if TYPE_CHECKING:
     from app.models.session import Session
     from app.models.evidence import Evidence
     from app.models.agent_run import AgentRun
+    from app.models.claim import Claim
+    from app.models.source_group import SourceGroup
+    from app.models.contradiction import Contradiction
 
 class Query(TimestampMixin, Base):
     """Database model for a user query."""
@@ -46,6 +49,21 @@ class Query(TimestampMixin, Base):
     )
     agent_runs: Mapped[list["AgentRun"]] = relationship(
         "AgentRun",
+        back_populates="query",
+        cascade="all, delete-orphan"
+    )
+    claims: Mapped[list["Claim"]] = relationship(
+        "Claim",
+        back_populates="query",
+        cascade="all, delete-orphan"
+    )
+    source_groups: Mapped[list["SourceGroup"]] = relationship(
+        "SourceGroup",
+        back_populates="query",
+        cascade="all, delete-orphan"
+    )
+    contradictions: Mapped[list["Contradiction"]] = relationship(
+        "Contradiction",
         back_populates="query",
         cascade="all, delete-orphan"
     )

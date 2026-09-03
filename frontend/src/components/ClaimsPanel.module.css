@@ -1,0 +1,126 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  height: 100%;
+}
+
+.filters {
+  display: flex;
+  gap: 12px;
+}
+
+.select {
+  padding: 8px;
+  border: 1px solid var(--outline-variant, #ccc);
+  border-radius: 4px;
+  background: var(--surface, #fff);
+  color: var(--on-surface, #000);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+}
+
+.card {
+  border: 1px solid var(--outline-variant, #ccc);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--surface-container, #f9f9f9);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.badge {
+  font-size: 10px;
+  font-weight: bold;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #eee;
+  color: #333;
+}
+
+.FACT { background: #d0ebd0; color: #1a4d1a; }
+.CALCULATION { background: #d0d0eb; color: #1a1a4d; }
+.INFERENCE { background: #ebd0d0; color: #4d1a1a; }
+
+.statusBadge {
+  font-size: 10px;
+  font-weight: bold;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.VERIFIED { background: #4caf50; color: white; }
+.DISPUTED { background: #f44336; color: white; }
+.UNVERIFIED { background: #ff9800; color: white; }
+
+.content {
+  font-size: 14px;
+  margin-bottom: 12px;
+  color: var(--on-surface, #000);
+}
+
+.confidence {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  margin-bottom: 12px;
+}
+
+.barBg {
+  flex: 1;
+  height: 6px;
+  background: #eee;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.barFill {
+  height: 100%;
+  background: #2196f3;
+}
+
+.expandBtn {
+  background: none;
+  border: none;
+  color: #2196f3;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0;
+}
+
+.sources {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed #ccc;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sourceItem {
+  font-size: 12px;
+  background: #fff;
+  padding: 8px;
+  border-radius: 4px;
+  border: 1px solid #eee;
+}
+
+.sourceItem p {
+  margin: 0 0 4px 0;
+  font-style: italic;
+}
+
+.sourceItem a {
+  color: #2196f3;
+  text-decoration: none;
+}

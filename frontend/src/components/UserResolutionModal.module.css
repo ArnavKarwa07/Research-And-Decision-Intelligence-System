@@ -1,0 +1,159 @@
+.overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal {
+  background: var(--surface, #fff);
+  border-radius: 8px;
+  width: 90%;
+  max-width: 800px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+}
+
+.header {
+  padding: 16px;
+  border-bottom: 1px solid var(--outline-variant, #ccc);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.closeBtn {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #666;
+}
+
+.comparison {
+  display: flex;
+  gap: 16px;
+  padding: 16px;
+  overflow-y: auto;
+  background: #f9f9f9;
+}
+
+@media (max-width: 768px) {
+  .comparison {
+    flex-direction: column;
+  }
+}
+
+.claimColumn {
+  flex: 1;
+  background: #fff;
+  padding: 16px;
+  border-radius: 4px;
+  border: 1px solid #eee;
+}
+
+.claimColumn h3 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  color: #666;
+}
+
+.claimContent {
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 16px;
+}
+
+.sources h4 {
+  margin: 0 0 8px 0;
+  font-size: 12px;
+  color: #999;
+}
+
+.sources blockquote {
+  margin: 0 0 8px 0;
+  padding: 8px;
+  background: #f5f5f5;
+  border-left: 3px solid #ccc;
+  font-size: 12px;
+  font-style: italic;
+}
+
+.form {
+  padding: 16px;
+  border-top: 1px solid var(--outline-variant, #ccc);
+}
+
+.choices {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.choices label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.notes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.notes label {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.notes textarea {
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.cancelBtn {
+  padding: 8px 16px;
+  background: transparent;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.submitBtn {
+  padding: 8px 16px;
+  background: #2196f3;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.submitBtn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}

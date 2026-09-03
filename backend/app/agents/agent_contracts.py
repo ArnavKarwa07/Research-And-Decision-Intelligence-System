@@ -179,3 +179,36 @@ class AdversarialOutput(BaseModel):
     confidence_adjusted: float
     issues: List[AuditIssue] = Field(default_factory=list)
     assessment_message: str
+
+class FactCheckInput(BaseModel):
+    claim: AtomicClaim
+    existing_source_urls: List[str] = Field(default_factory=list)
+    budget: int = 50000
+
+class FactCheckOutput(BaseModel):
+    verdict: str
+    confidence_adjustment: float
+    new_sources: List[SourceMetadata] = Field(default_factory=list)
+    supporting_evidence: List[RawSnippet] = Field(default_factory=list)
+    conflicting_evidence: List[RawSnippet] = Field(default_factory=list)
+
+# --- Contradiction Agent Contract ---
+class ContradictionDetail(BaseModel):
+    claim_a_id: str
+    claim_b_id: str
+    contradiction_type: str
+    severity: str
+    description: str
+    resolution_status: str
+    resolution_notes: Optional[str] = None
+
+class ContradictionAgentInput(BaseModel):
+    claims: List[AtomicClaim]
+    sources: List[SourceMetadata]
+    query_id: str
+
+class ContradictionAgentOutput(BaseModel):
+    contradictions: List[ContradictionDetail]
+    auto_resolved_count: int
+    escalated_count: int
+    unresolved_claims: List[str]

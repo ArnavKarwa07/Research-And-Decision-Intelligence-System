@@ -6,7 +6,7 @@ Welcome to the Research And Decision Intelligence System (RADIS) developer docum
 
 RADIS is structured as a monorepo containing a Python backend and a pure JavaScript Vite + React frontend styled 1-to-1 with the Stitch MCP Design System.
 
-- **Backend (`/backend`)**: Built with FastAPI and Python 3.12. It handles database interactions via async SQLAlchemy (supporting SQLite for local dev & PostgreSQL for production), orchestrates multi-agent workflows using a custom `BaseAgent` framework, manages LLM interactions, and exposes REST endpoints and Server-Sent Events (SSE) streams.
+- **Backend (`/backend`)**: Built with FastAPI and Python 3.12. It handles database interactions via async SQLAlchemy (supporting SQLite for local dev & PostgreSQL for production), orchestrates multi-agent workflows using a custom `BaseAgent` framework with an extended LangGraph conditional routing state machine (`should_reverify`), manages LLM interactions, and exposes REST endpoints and Server-Sent Events (SSE) streams.
 - **Frontend (`/frontend`)**: A pure JavaScript React application powered by Vite (running natively on **port 5173**). Rebuilt to align 1-to-1 with the Stitch MCP UI Prototype (`RADIS Decision Command Center`). Styled with Tailwind CSS, Google Material Symbols, micro-caps typography, radar hero animations, live telemetry stream timelines, and zero non-functional buttons or dummy fallbacks. Audited with `react-doctor` (**100/100 Great score**).
 
 ## Quickstart Guide
@@ -63,6 +63,13 @@ RADIS employs a strict set of rules for agent development to ensure reliability,
 4. **Tool Safety:** All tools must be registered via the central registry with input schema validation. Content extractors enforce strict SSRF protections (`is_safe_url`).
 5. **Separation of Concerns:** The Supervisor Agent plans and delegates; Research Agents execute and gather. Never mix orchestration with execution.
 6. **Streaming First:** Intermediate progress and evidence emit via SSE to drive real-time UI.
+7. **Phase 3 Evidence Intelligence Pipeline:**
+   - **`ClaimExtractor` & `ConfidenceEngine`**: Extracts atomic claims into a 7-type taxonomy and scores them via weighted formulas.
+   - **`SourceScorer`**: Assesses credibility, freshness, and independence of sources.
+   - **`FactCheckAgent`**: Uses 3 search strategies (Direct, Authority, Counter-evidence) and enforces strict URL/`content_hash` deduplication.
+   - **`ContradictionAgent`**: Runs a 5-check detection pipeline for conflicts, assigns severity scores, and drives a resolution state machine.
+   - **`ProvenanceAgent`**: Builds the Evidence Graph engine.
+   - **LangGraph Routing (`should_reverify`)**: Routes execution to additional verification loops if confidence is low or contradictions are severe.
 
 ## Testing & Audit Commands
 

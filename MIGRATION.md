@@ -46,3 +46,27 @@ cd backend
 alembic revision --autogenerate -m "Add agent_runs table and query research_plan json"
 alembic upgrade head
 ```
+
+## Phase 3 Implemented Schema Additions (Evidence Intelligence)
+
+Phase 3 introduces advanced evidence tracking, scoring, and contradiction resolution tables:
+
+1. **New Tables:**
+   - `claims`: Stores atomic extracted claims (7-type taxonomy) and confidence scores. Includes columns: `query_id`, `created_by_agent_run_id`, `verified_at`, `metadata`.
+   - `claim_sources`: Junction table mapping claims to sources with excerpt and support type.
+   - `source_groups`: Groups related sources for independence scoring.
+   - `source_group_members`: Junction table mapping sources to groups.
+   - `contradictions`: Stores detected conflicts, severity scores, and resolution states. Includes columns: `query_id`, `claim_a_id`, `claim_b_id`, `contradiction_type`, `severity`, `resolution_status`, `resolution_notes`, `metadata`.
+
+2. **`sources` Table Extensions:**
+   - Added columns: `publisher`, `source_type`, `published_at`, `content_hash` (indexed for content deduplication lookup), `independence_group`, and `freshness_category`.
+
+### Migration Execution (Phase 3)
+
+To apply the Phase 3 schema migrations to local SQLite/PostgreSQL:
+
+```bash
+cd backend
+alembic revision --autogenerate -m "Phase 3 Evidence Intelligence additions"
+alembic upgrade head
+```

@@ -8,6 +8,7 @@ from .retrieval import RetrievalAgent
 from .evidence import EvidenceAgent
 from .synthesis import SynthesisAgent
 from .adversarial import AdversarialAgent
+from .contradiction import ContradictionAgent
 from .graph import langgraph_app, create_langgraph_workflow
 
 __all__ = [
@@ -37,6 +38,7 @@ __all__ = [
     "EvidenceAgent",
     "SynthesisAgent",
     "AdversarialAgent",
+    "ContradictionAgent",
     "langgraph_app",
     "create_langgraph_workflow",
 ]

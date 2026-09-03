@@ -4,6 +4,15 @@ from .session import SessionCreate, SessionResponse, SessionList
 from .query import QueryCreate, QueryResponse, QueryStatus
 from .evidence import EvidenceType, EvidenceResponse
 from .source import SourceResponse
+from .claim import (
+    ClaimType, ClaimStatus, SupportType, ClaimCreate,
+    ClaimResponse, ClaimSourceLinkCreate, ClaimSourceResponse
+)
+from .contradiction import (
+    ContradictionType, ContradictionSeverity, ResolutionStatus,
+    ContradictionResponse, ContradictionResolveRequest
+)
+from .source_group import SourceGroupType, SourceGroupResponse
 
 __all__ = [
     "ErrorResponse",
@@ -17,4 +26,18 @@ __all__ = [
     "EvidenceType",
     "EvidenceResponse",
     "SourceResponse",
+    "ClaimType",
+    "ClaimStatus",
+    "SupportType",
+    "ClaimCreate",
+    "ClaimResponse",
+    "ClaimSourceLinkCreate",
+    "ClaimSourceResponse",
+    "ContradictionType",
+    "ContradictionSeverity",
+    "ResolutionStatus",
+    "ContradictionResponse",
+    "ContradictionResolveRequest",
+    "SourceGroupType",
+    "SourceGroupResponse",
 ]

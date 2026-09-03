@@ -7,6 +7,9 @@ import PlanGraphView from './components/PlanGraphView';
 import DecisionMatrixCard from './components/DecisionMatrixCard';
 import EmptyHeroState from './components/EmptyHeroState';
 import TerminalLogsModal from './components/TerminalLogsModal';
+import ClaimsPanel from './components/ClaimsPanel';
+import ContradictionsPanel from './components/ContradictionsPanel';
+import EvidenceGraphView from './components/EvidenceGraphView';
 import { api } from './lib/api';
 import { connectToStream } from './lib/sse';
 
@@ -24,6 +27,10 @@ export default function App() {
   const [evidence, setEvidence] = useState([]);
   const [plan, setPlan] = useState([]);
   const [decisionMatrix, setDecisionMatrix] = useState(null);
+  const [claims, setClaims] = useState([]);
+  const [contradictions, setContradictions] = useState([]);
+  const [graphData, setGraphData] = useState({ nodes: [], edges: [], stats: {} });
+  const [activeTab, setActiveTab] = useState('Evidence');
   const [errorMsg, setErrorMsg] = useState(null);
   const [showLogsModal, setShowLogsModal] = useState(false);
   
@@ -35,9 +42,13 @@ export default function App() {
     setEvidence([]);
     setPlan([]);
     setDecisionMatrix(null);
+    setClaims([]);
+    setContradictions([]);
+    setGraphData({ nodes: [], edges: [], stats: {} });
     setIsResearching(false);
     setCurrentQuery(null);
     setErrorMsg(null);
+    setActiveTab('Evidence');
   }, []);
 
   const handleNewSession = useCallback(async () => {
@@ -136,8 +147,34 @@ export default function App() {
           if (resultData.data?.decision_matrix) {
             setDecisionMatrix(resultData.data.decision_matrix);
           }
+          if (resultData.data?.claims) {
+            setClaims(resultData.data.claims);
+          }
+          if (resultData.data?.contradictions) {
+            setContradictions(resultData.data.contradictions);
+          }
+          if (resultData.data?.graphData) {
+            setGraphData(resultData.data.graphData);
+          }
           if (streamCleanupRef.current) streamCleanupRef.current();
           streamCleanupRef.current = null;
+        },
+        onPhase3Event: (eventType, data) => {
+          if (eventType.startsWith('claim:')) {
+            setClaims(prev => {
+              const existing = prev.find(c => c.id === data.id);
+              if (existing) return prev.map(c => c.id === data.id ? { ...c, ...data } : c);
+              return [...prev, data];
+            });
+          } else if (eventType.startsWith('contradiction:')) {
+            setContradictions(prev => {
+              const existing = prev.find(c => c.id === data.id);
+              if (existing) return prev.map(c => c.id === data.id ? { ...c, ...data } : c);
+              return [...prev, data];
+            });
+          } else if (eventType === 'evidence:graph_updated') {
+            setGraphData(data.graphData || data);
+          }
         },
         onError: (err) => {
           console.error('SSE Stream Error:', err);
@@ -169,6 +206,17 @@ export default function App() {
           agentType: 'System'
         }
       ]);
+    }
+  };
+
+  const handleResolveContradiction = async (id, resolutionData) => {
+    try {
+      await api.resolveContradiction(id, resolutionData);
+      setContradictions(prev => prev.map(c => 
+        c.id === id ? { ...c, resolution_status: resolutionData.resolution_choice } : c
+      ));
+    } catch(e) {
+      console.error("Failed to resolve contradiction", e);
     }
   };
 
@@ -243,33 +291,62 @@ export default function App() {
               </div>
             )}
 
-            {steps.length === 0 && evidence.length === 0 ? (
+            {steps.length === 0 && evidence.length === 0 && claims.length === 0 ? (
               <EmptyHeroState onSubmitQuery={handleSubmitQuery} />
             ) : (
               /* Inline Results Stream View */
-              <div className="flex-1 flex flex-col w-full">
-                {/* Inline Telemetry Stream */}
-                <ResearchProgress steps={steps} isActive={isResearching} />
+              <div className="flex-1 flex flex-col w-full h-full">
+                
+                {/* Tabs */}
+                <div className="flex gap-4 border-b border-outline-variant mb-4 pb-2">
+                  {['Evidence', 'Claims', 'Contradictions', 'Graph'].map(tab => (
+                    <button 
+                      key={tab}
+                      onClick={() => setActiveTab(tab)}
+                      className={`font-bold pb-1 px-2 border-b-2 ${activeTab === tab ? 'border-primary text-primary' : 'border-transparent text-on-surface-variant'}`}
+                    >
+                      {tab}
+                    </button>
+                  ))}
+                </div>
 
-                {/* Plan Dependency Graph */}
-                <PlanGraphView plan={plan} activeAgent={steps[steps.length - 1]?.agentType} />
+                <div className="flex-1 overflow-y-auto pb-24">
+                  {activeTab === 'Evidence' && (
+                    <>
+                      {/* Inline Telemetry Stream */}
+                      <ResearchProgress steps={steps} isActive={isResearching} />
+                      {/* Plan Dependency Graph */}
+                      <PlanGraphView plan={plan} activeAgent={steps[steps.length - 1]?.agentType} />
+                      {/* Executive Decision Matrix */}
+                      <DecisionMatrixCard decisionMatrix={decisionMatrix} confidence={currentQuery?.confidence} />
+                      {/* Verified Findings & Evidence */}
+                      {evidence.length > 0 && (
+                        <div className="mb-6">
+                          <div className="flex items-center justify-between pb-2 mb-4 border-b border-outline-variant">
+                            <h3 className="font-bold text-base text-on-surface">Verified Findings & Evidence</h3>
+                            <span className="font-mono text-xs font-bold text-tertiary">{evidence.length} FACT CHECKED</span>
+                          </div>
+                          {evidence.map(ev => (
+                            <EvidenceCard key={ev.id} evidence={ev} />
+                          ))}
+                        </div>
+                      )}
+                      <div ref={resultsEndRef} />
+                    </>
+                  )}
 
-                {/* Executive Decision Matrix */}
-                <DecisionMatrixCard decisionMatrix={decisionMatrix} confidence={currentQuery?.confidence} />
+                  {activeTab === 'Claims' && (
+                    <ClaimsPanel claims={claims} />
+                  )}
 
-                {/* Verified Findings & Evidence */}
-                {evidence.length > 0 && (
-                  <div className="mb-6">
-                    <div className="flex items-center justify-between pb-2 mb-4 border-b border-outline-variant">
-                      <h3 className="font-bold text-base text-on-surface">Verified Findings & Evidence</h3>
-                      <span className="font-mono text-xs font-bold text-tertiary">{evidence.length} FACT CHECKED</span>
-                    </div>
-                    {evidence.map(ev => (
-                      <EvidenceCard key={ev.id} evidence={ev} />
-                    ))}
-                  </div>
-                )}
-                <div ref={resultsEndRef} />
+                  {activeTab === 'Contradictions' && (
+                    <ContradictionsPanel contradictions={contradictions} onResolve={handleResolveContradiction} />
+                  )}
+
+                  {activeTab === 'Graph' && (
+                    <EvidenceGraphView graphData={graphData} />
+                  )}
+                </div>
               </div>
             )}
 
