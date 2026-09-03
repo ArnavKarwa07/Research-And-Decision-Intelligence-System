@@ -132,3 +132,47 @@ cd backend
 alembic revision --autogenerate -m "Phase 4 Internal Knowledge + RAG additions"
 alembic upgrade head
 ```
+
+## Phase 5 Implemented Schema & Self-Challenge Additions
+
+Phase 5 introduces autonomous self-challenge engines, competing hypothesis tracking, red-team critique auditing, and dynamic graph re-planning.
+
+### 1. Database Schema Additions (`Hypothesis`, `CritiqueReport`)
+
+Phase 5 adds two new tables mapped via SQLAlchemy models in `app.models.hypothesis` and `app.models.critique_report`:
+
+1. **`hypotheses` Table (`Hypothesis` model):**
+   - Stores generated competing hypotheses linked to a research query (`query_id` FK).
+   - Columns: `id` (UUID, PK), `query_id` (FK to `queries.id`, `ondelete="CASCADE"`, indexed), `statement` (Text), `status` (String, default `"proposed"`), `confidence` (Float, default `0.5`), `supporting_claim_ids` (JSON), `falsifying_claim_ids` (JSON), `evidence_map` (JSON), `falsification_attempts` (Integer, default `0`), `max_falsification_attempts` (Integer, default `5`), `metadata` (JSON), `created_at` (DateTime), `updated_at` (DateTime).
+
+2. **`critique_reports` Table (`CritiqueReport` model):**
+   - Stores independent red-team audit findings and remediation recommendations linked to a query (`query_id` FK).
+   - Columns: `id` (UUID, PK), `query_id` (FK to `queries.id`, `ondelete="CASCADE"`, indexed), `synthesis_snapshot` (Text), `findings` (JSON), `weak_evidence` (JSON), `missing_variables` (JSON), `overall_severity` (String, default `"LOW"`), `recommendations` (JSON), `replan_triggered` (Boolean, default `False`), `iteration` (Integer, default `1`), `created_at` (DateTime), `updated_at` (DateTime).
+
+### 2. Environment Variable & Configuration Settings (`app/config.py`)
+
+The following Phase 5 configuration settings are available in `app/config.py` / `.env`:
+
+| Variable | Default Value | Description |
+| :--- | :--- | :--- |
+| `MAX_REPLAN_ITERATIONS` | `3` | Maximum dynamic re-planning loop iterations allowed per query |
+| `CONFIDENCE_THRESHOLD` | `0.3` | Minimum acceptable confidence threshold before triggering re-planning |
+| `HYPOTHESIS_COUNT_LIMIT` | `7` | Maximum number of competing hypotheses generated per research query |
+| `CRITIC_STRICTNESS` | `"HIGH"` | Red-team auditing strictness level (`"LOW"`, `"MEDIUM"`, `"HIGH"`, `"CRITICAL"`) |
+
+### 3. Migration Execution (Phase 5)
+
+To apply the Phase 5 schema additions to local SQLite/PostgreSQL:
+
+```bash
+cd backend
+alembic revision --autogenerate -m "Phase 5 Self-Challenge and Dynamic Re-planning additions"
+alembic upgrade head
+```
+
+### 4. Backward Compatibility Notes
+
+- **Non-Breaking Schema Extensions**: All new tables (`hypotheses`, `critique_reports`) use Foreign Key references to `queries.id` with `ON DELETE CASCADE`. Existing tables (`sessions`, `queries`, `claims`, `contradictions`, `documents`, `vector_collections`) remain 100% untouched.
+- **Optional Relationships**: `Query.hypotheses` and `Query.critique_reports` relationships are defined with `cascade="all, delete-orphan"`, ensuring safe cleanup without affecting existing queries.
+- **Graceful Fallbacks**: Queries submitted in Phase 1-4 standard mode continue to execute cleanly without requiring hypothesis generation or red-team critique passes unless explicitly triggered via `/self-challenge` or `/critique` endpoints.
+

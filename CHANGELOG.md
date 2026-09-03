@@ -5,6 +5,24 @@ All notable changes to the Research And Decision Intelligence System (RADIS) wil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.0.0] - Phase 5 Release - 2026-09-04
+
+### Added (Phase 5 Self-Challenge & Dynamic Re-planning)
+- **Alternative Hypothesis Engine (`HypothesisAgent`)**: Automatic generation of 3-7 competing, falsifiable hypotheses for any research query, tracked with confidence scores and discriminating evidence criteria.
+- **Falsification Agent (`FalsificationAgent`)**: Targeted inverse query formulation, counter-evidence collection, and net-weight confidence updates to systematically disconfirm preliminary hypotheses.
+- **Critic / Red-Team Agent (`CriticAgent`)**: Independent red-team review auditing evidence quality (single-source, low confidence), logical coherence, completeness (omitted variables), and framing bias without shared state.
+- **Dynamic Re-planning Loop**: Extended LangGraph conditional graph routing (`should_replan` / `replan_triggered`) allowing automatic loop-back to Research/Fact-Check nodes when red-team audit flags severe gaps (`HIGH` / `CRITICAL`).
+- **Self-Challenge Service & REST Endpoints**: End-to-end self-challenge orchestration service exposing endpoints:
+  - `POST /queries/{query_id}/hypotheses/generate`
+  - `GET /queries/{query_id}/hypotheses`
+  - `GET /hypotheses/{hypothesis_id}`
+  - `POST /hypotheses/{hypothesis_id}/falsify`
+  - `POST /queries/{query_id}/critique`
+  - `POST /queries/{query_id}/self-challenge`
+- **SSE Telemetry Events**: 6 new Server-Sent Event stream types: `hypothesis:generated`, `hypothesis:falsification_started`, `hypothesis:falsified`, `critique:report_generated`, `replan:triggered`, `self_challenge:completed`.
+- **Database Schema Additions**: `hypotheses` and `critique_reports` tables with full SQLAlchemy models and CASCADE relationships to `queries`.
+- **Agent Contracts**: Enforced Pydantic V2 schemas for `HypothesisAgentInput`/`Output`, `FalsificationInput`/`Output`, and `CriticInput`/`Output`.
+
 ## [4.0.0] - Phase 4 Release - 2026-09-04
 
 ### Added (Phase 4 Internal Knowledge + RAG)

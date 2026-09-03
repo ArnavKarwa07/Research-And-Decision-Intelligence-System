@@ -14,6 +14,8 @@ if TYPE_CHECKING:
     from app.models.claim import Claim
     from app.models.source_group import SourceGroup
     from app.models.contradiction import Contradiction
+    from app.models.hypothesis import Hypothesis
+    from app.models.critique_report import CritiqueReport
 
 class Query(TimestampMixin, Base):
     """Database model for a user query."""
@@ -64,6 +66,16 @@ class Query(TimestampMixin, Base):
     )
     contradictions: Mapped[list["Contradiction"]] = relationship(
         "Contradiction",
+        back_populates="query",
+        cascade="all, delete-orphan"
+    )
+    hypotheses: Mapped[list["Hypothesis"]] = relationship(
+        "Hypothesis",
+        back_populates="query",
+        cascade="all, delete-orphan"
+    )
+    critique_reports: Mapped[list["CritiqueReport"]] = relationship(
+        "CritiqueReport",
         back_populates="query",
         cascade="all, delete-orphan"
     )

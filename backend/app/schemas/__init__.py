@@ -14,6 +14,13 @@ from .contradiction import (
 )
 from .source_group import SourceGroupType, SourceGroupResponse
 from .document import DocumentResponse, DocumentChunkResponse
+from .hypothesis import (
+    HypothesisStatus, EvidenceRelationship, CritiqueSeverity, WeakEvidenceReason,
+    EvidenceMapItem, EvidenceMapEntry, WeakEvidenceItem, MissingVariable, MissingVariableItem,
+    HypothesisCreate, HypothesisUpdate, HypothesisResponse,
+    CritiqueReportResponse,
+    SelfChallengeRequest, SelfChallengeResponse
+)
 
 __all__ = [
     "ErrorResponse",
@@ -43,5 +50,19 @@ __all__ = [
     "SourceGroupResponse",
     "DocumentResponse",
     "DocumentChunkResponse",
+    "HypothesisStatus",
+    "EvidenceRelationship",
+    "CritiqueSeverity",
+    "WeakEvidenceReason",
+    "EvidenceMapItem",
+    "EvidenceMapEntry",
+    "WeakEvidenceItem",
+    "MissingVariable",
+    "MissingVariableItem",
+    "HypothesisCreate",
+    "HypothesisUpdate",
+    "HypothesisResponse",
+    "CritiqueReportResponse",
+    "SelfChallengeRequest",
+    "SelfChallengeResponse",
 ]
-

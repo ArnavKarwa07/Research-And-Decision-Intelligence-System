@@ -27,7 +27,7 @@ class EvidenceSupportStatus(str, Enum):
 # --- Supervisor / Dynamic Planner Contract ---
 class PlanSubTask(BaseModel):
     id: str
-    task_type: str  # research, retrieval, evidence, synthesis, adversarial
+    task_type: str  # research, retrieval, evidence, synthesis, adversarial, hypothesis, falsification, critic
     title: str
     objective: str
     dependencies: List[str] = Field(default_factory=list)
@@ -37,7 +37,7 @@ class PlanSubTask(BaseModel):
 
 class SupervisorInput(BaseModel):
     objective: str
-    mode: str = "comprehensive"  # quick, comprehensive, deep_dive, comparative, exploratory, adversarial
+    mode: str = "comprehensive"  # quick, comprehensive, deep_dive, comparative, exploratory, adversarial, deep
     constraints: List[str] = Field(default_factory=list)
     decision_criteria: List[str] = Field(default_factory=list)
     max_budget_tokens: int = 50000
@@ -115,7 +115,6 @@ class AtomicClaim(BaseModel):
     citation: Optional[str] = None
 
 
-
 class EvidenceAgentInput(BaseModel):
     raw_snippets: List[RawSnippet] = Field(default_factory=list)
     document_chunks: List[DocumentChunk] = Field(default_factory=list)
@@ -182,10 +181,12 @@ class AdversarialOutput(BaseModel):
     issues: List[AuditIssue] = Field(default_factory=list)
     assessment_message: str
 
+
 class FactCheckInput(BaseModel):
     claim: AtomicClaim
     existing_source_urls: List[str] = Field(default_factory=list)
     budget: int = 50000
+
 
 class FactCheckOutput(BaseModel):
     verdict: str
@@ -193,6 +194,7 @@ class FactCheckOutput(BaseModel):
     new_sources: List[SourceMetadata] = Field(default_factory=list)
     supporting_evidence: List[RawSnippet] = Field(default_factory=list)
     conflicting_evidence: List[RawSnippet] = Field(default_factory=list)
+
 
 # --- Contradiction Agent Contract ---
 class ContradictionDetail(BaseModel):
@@ -204,13 +206,69 @@ class ContradictionDetail(BaseModel):
     resolution_status: str
     resolution_notes: Optional[str] = None
 
+
 class ContradictionAgentInput(BaseModel):
     claims: List[AtomicClaim]
     sources: List[SourceMetadata]
     query_id: str
+
 
 class ContradictionAgentOutput(BaseModel):
     contradictions: List[ContradictionDetail]
     auto_resolved_count: int
     escalated_count: int
     unresolved_claims: List[str]
+
+
+# --- Phase 5: Self-Challenge Contracts ---
+class HypothesisItem(BaseModel):
+    hypothesis_id: str
+    statement: str
+    initial_confidence: float = 0.5
+    discriminating_evidence_needed: List[str] = Field(default_factory=list)
+
+
+class HypothesisAgentInput(BaseModel):
+    query_text: str
+    existing_claims: List[Dict[str, Any]] = Field(default_factory=list)
+    existing_sources: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+class HypothesisAgentOutput(BaseModel):
+    hypotheses: List[HypothesisItem]
+    investigation_priorities: List[str] = Field(default_factory=list)
+
+
+class FalsificationTask(BaseModel):
+    hypothesis_id: str
+    inverse_queries: List[str] = Field(default_factory=list)
+    expected_counter_evidence: str = ""
+
+
+class FalsificationInput(BaseModel):
+    hypothesis: HypothesisItem
+    research_context: str = ""
+
+
+class FalsificationOutput(BaseModel):
+    hypothesis_id: str
+    evidence_items: List[Dict[str, Any]] = Field(default_factory=list)
+    updated_confidence: float = 0.5
+    attempts_used: int = 1
+    status_summary: str = ""
+
+
+class CriticInput(BaseModel):
+    synthesis: str
+    evidence_chain: List[Dict[str, Any]] = Field(default_factory=list)
+    hypotheses: Optional[List[HypothesisItem]] = Field(default_factory=list)
+    claims: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+class CriticOutput(BaseModel):
+    findings: List[str] = Field(default_factory=list)
+    weak_evidence: List[Dict[str, Any]] = Field(default_factory=list)
+    missing_variables: List[Dict[str, Any]] = Field(default_factory=list)
+    overall_severity: str = "LOW"
+    recommendations: List[str] = Field(default_factory=list)
+    replan_recommended: bool = False

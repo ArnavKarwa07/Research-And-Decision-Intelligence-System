@@ -16,6 +16,7 @@ pytestmark = pytest.mark.asyncio
 @pytest.fixture
 def mock_db_session():
     session = AsyncMock(spec=AsyncSession)
+    session.refresh = AsyncMock()
     return session
 
 async def test_claim_extractor_extract_claims(mock_db_session):
@@ -43,7 +44,7 @@ async def test_claim_extractor_extract_claims(mock_db_session):
 
 async def test_claim_extractor_link_provenance(mock_db_session):
     extractor = ClaimExtractor(db_session=mock_db_session)
-    claim = Claim(id=uuid.uuid4(), content="The sky is blue")
+    claim = Claim(id=uuid.uuid4(), query_id=uuid.uuid4(), content="The sky is blue")
     
     source_snippets = [
         {"source_id": str(uuid.uuid4()), "content": "Today, The sky is blue and clear."},
@@ -56,6 +57,7 @@ async def test_claim_extractor_link_provenance(mock_db_session):
     assert links[0].excerpt_location["startChar"] == 7
     mock_db_session.add.assert_called_once()
     mock_db_session.commit.assert_called_once()
+
 
 async def test_fact_check_agent_search_strategies_and_deduplication():
     agent = FactCheckAgent()

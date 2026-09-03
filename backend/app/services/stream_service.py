@@ -98,3 +98,27 @@ def emit_document_status_updated(document_id: UUID, document_data: dict[str, Any
     stream_service.publish(document_id, StreamEvent(event_type="document:status_updated", data=document_data, timestamp=datetime.now()))
 
 
+# Phase 5 Telemetry Emission Helpers
+def emit_hypothesis_generated(query_id: UUID, data: dict[str, Any]):
+    stream_service.publish(query_id, StreamEvent(event_type="hypothesis:generated", data=data, timestamp=datetime.now()))
+
+def emit_hypothesis_falsified(query_id: UUID, data: dict[str, Any]):
+    stream_service.publish(query_id, StreamEvent(event_type="hypothesis:falsified", data=data, timestamp=datetime.now()))
+
+def emit_hypothesis_evaluated(query_id: UUID, data: dict[str, Any]):
+    stream_service.publish(query_id, StreamEvent(event_type="hypothesis:evaluated", data=data, timestamp=datetime.now()))
+
+def emit_critic_started(query_id: UUID, data: dict[str, Any]):
+    stream_service.publish(query_id, StreamEvent(event_type="critic:started", data=data, timestamp=datetime.now()))
+
+def emit_critic_objection(query_id: UUID, data: dict[str, Any]):
+    stream_service.publish(query_id, StreamEvent(event_type="critic:objection", data=data, timestamp=datetime.now()))
+
+def emit_critic_replan_triggered(query_id: UUID, data: dict[str, Any]):
+    stream_service.publish(query_id, StreamEvent(event_type="critic:replan_triggered", data=data, timestamp=datetime.now()))
+
+def emit_self_challenge_complete(query_id: UUID, data: dict[str, Any]):
+    stream_service.publish(query_id, StreamEvent(event_type="self_challenge:complete", data=data, timestamp=datetime.now()))
+
+
+

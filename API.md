@@ -254,6 +254,274 @@ GET /runs/{run_id}/decision
 POST /runs/{run_id}/decision/feedback
 ```
 
+## Self-Challenge & Dynamic Re-planning (Phase 5)
+
+### Endpoint Outline
+
+```http
+POST /api/v1/queries/{query_id}/hypotheses/generate
+GET /api/v1/queries/{query_id}/hypotheses
+GET /api/v1/hypotheses/{hypothesis_id}
+POST /api/v1/hypotheses/{hypothesis_id}/falsify
+POST /api/v1/queries/{query_id}/critique
+POST /api/v1/queries/{query_id}/self-challenge
+```
+
+### JSON Examples
+
+**`POST /api/v1/queries/{query_id}/hypotheses/generate`**
+*Description:* Triggers `HypothesisAgent` to generate 3-7 competing, falsifiable hypotheses for the specified query.
+*Request Body (Optional):*
+```json
+{
+  "max_hypotheses": 5,
+  "existing_claims": []
+}
+```
+*Response (HTTP 201 Created):*
+```json
+[
+  {
+    "id": "hyp-a1b2c3d4-1111-4000-8000-000000000001",
+    "query_id": "q_45678901-1234-5678-1234-567812345678",
+    "statement": "Primary assertion: System throughput scales linearly under microservice architecture.",
+    "status": "proposed",
+    "confidence": 0.6,
+    "supporting_claim_ids": ["c_123"],
+    "falsifying_claim_ids": [],
+    "evidence_map": [],
+    "falsification_attempts": 0,
+    "max_falsification_attempts": 5,
+    "metadata_": {
+      "discriminating_evidence_needed": [
+        "Direct empirical throughput benchmarks",
+        "Network latency overhead measurements"
+      ]
+    },
+    "created_at": "2026-09-04T00:10:00Z",
+    "updated_at": "2026-09-04T00:10:00Z"
+  },
+  {
+    "id": "hyp-a1b2c3d4-1111-4000-8000-000000000002",
+    "query_id": "q_45678901-1234-5678-1234-567812345678",
+    "statement": "Alternative assertion: Throughput bottlenecks occur at database synchronization boundaries.",
+    "status": "proposed",
+    "confidence": 0.4,
+    "supporting_claim_ids": [],
+    "falsifying_claim_ids": [],
+    "evidence_map": [],
+    "falsification_attempts": 0,
+    "max_falsification_attempts": 5,
+    "metadata_": {
+      "discriminating_evidence_needed": [
+        "Database locking profiling",
+        "Connection pool saturation logs"
+      ]
+    },
+    "created_at": "2026-09-04T00:10:00Z",
+    "updated_at": "2026-09-04T00:10:00Z"
+  }
+]
+```
+
+**`GET /api/v1/queries/{query_id}/hypotheses`**
+*Description:* Retrieves all generated hypotheses associated with a research query.
+*Response (HTTP 200 OK):*
+```json
+[
+  {
+    "id": "hyp-a1b2c3d4-1111-4000-8000-000000000001",
+    "query_id": "q_45678901-1234-5678-1234-567812345678",
+    "statement": "Primary assertion: System throughput scales linearly under microservice architecture.",
+    "status": "active",
+    "confidence": 0.65,
+    "supporting_claim_ids": ["c_123", "c_125"],
+    "falsifying_claim_ids": ["c_129"],
+    "evidence_map": [
+      {
+        "evidence_id": "ev_888",
+        "hypothesis_id": "hyp-a1b2c3d4-1111-4000-8000-000000000001",
+        "relationship": "SUPPORTS",
+        "weight": 0.8,
+        "justification": "Baseline load test proves linear scaling up to 10k RPS."
+      }
+    ],
+    "falsification_attempts": 1,
+    "max_falsification_attempts": 5,
+    "metadata_": {},
+    "created_at": "2026-09-04T00:10:00Z",
+    "updated_at": "2026-09-04T00:12:30Z"
+  }
+]
+```
+
+**`GET /api/v1/hypotheses/{hypothesis_id}`**
+*Description:* Retrieves detail for a specific hypothesis by UUID.
+*Response (HTTP 200 OK):*
+```json
+{
+  "id": "hyp-a1b2c3d4-1111-4000-8000-000000000001",
+  "query_id": "q_45678901-1234-5678-1234-567812345678",
+  "statement": "Primary assertion: System throughput scales linearly under microservice architecture.",
+  "status": "supported",
+  "confidence": 0.72,
+  "supporting_claim_ids": ["c_123", "c_125"],
+  "falsifying_claim_ids": ["c_129"],
+  "evidence_map": [
+    {
+      "evidence_id": "ev_888",
+      "hypothesis_id": "hyp-a1b2c3d4-1111-4000-8000-000000000001",
+      "relationship": "SUPPORTS",
+      "weight": 0.8,
+      "justification": "Baseline load test proves linear scaling up to 10k RPS."
+    },
+    {
+      "evidence_id": "ev_999",
+      "hypothesis_id": "hyp-a1b2c3d4-1111-4000-8000-000000000001",
+      "relationship": "FALSIFIES",
+      "weight": 0.5,
+      "justification": "Network saturation observed beyond 12k RPS."
+    }
+  ],
+  "falsification_attempts": 2,
+  "max_falsification_attempts": 5,
+  "metadata_": {},
+  "created_at": "2026-09-04T00:10:00Z",
+  "updated_at": "2026-09-04T00:15:00Z"
+}
+```
+
+**`POST /api/v1/hypotheses/{hypothesis_id}/falsify`**
+*Description:* Triggers `FalsificationAgent` to formulate targeted disconfirming queries, search for counter-evidence, and update hypothesis confidence.
+*Request Body (Optional):*
+```json
+{
+  "research_context": "Deep audit on high-concurrency microservice edge cases.",
+  "max_counter_queries": 3
+}
+```
+*Response (HTTP 200 OK):*
+```json
+{
+  "hypothesis_id": "hyp-a1b2c3d4-1111-4000-8000-000000000001",
+  "evidence_items": [
+    {
+      "evidence_id": "ev_999",
+      "hypothesis_id": "hyp-a1b2c3d4-1111-4000-8000-000000000001",
+      "relationship": "FALSIFIES",
+      "weight": 0.8,
+      "justification": "Direct counter-evidence query flagged latency degradation under connection pool exhaustion.",
+      "source_url": "https://example.org/counter-benchmark",
+      "content": "Microservice response times degraded by 300% under pool starvation."
+    }
+  ],
+  "updated_confidence": 0.45,
+  "status_summary": "Falsification check completed for hyp-a1b2c3d4-1111-4000-8000-000000000001. Confidence updated to 0.45."
+}
+```
+
+**`POST /api/v1/queries/{query_id}/critique`**
+*Description:* Triggers `CriticAgent` to run an independent red-team audit across Evidence Quality, Logical Coherence, Completeness, and Bias Detection.
+*Request Body (Optional):*
+```json
+{
+  "synthesis_snapshot": "The system recommended Option B microservices architecture based on 5 supported claims.",
+  "claims": [
+    {"id": "c_123", "confidence": 0.88, "support_status": "SUPPORTED", "sources": [{"url": "https://example.com/spec"}]}
+  ]
+}
+```
+*Response (HTTP 200 OK):*
+```json
+{
+  "id": "crit-f9e8d7c6-5555-4000-8000-000000000001",
+  "query_id": "q_45678901-1234-5678-1234-567812345678",
+  "synthesis_snapshot": "The system recommended Option B microservices architecture based on 5 supported claims.",
+  "findings": [
+    "Evidence Quality Issue: Claim c_123 depends on single source.",
+    "Completeness Gap: Omitted variable 'financial_cost'."
+  ],
+  "weak_evidence": [
+    {
+      "claim_id": "c_123",
+      "reason": "SINGLE_SOURCE",
+      "severity": "MEDIUM",
+      "details": "Claim 'c_123' relies on only 1 source.",
+      "remediation": "Gather secondary independent sources to verify claim."
+    }
+  ],
+  "missing_variables": [
+    {
+      "variable": "financial_cost",
+      "impact": "HIGH",
+      "category": "OMITTED_FACTOR",
+      "suggested_action": "Include research analysis addressing financial cost."
+    }
+  ],
+  "overall_severity": "HIGH",
+  "recommendations": [
+    "Address 1 weak evidence item(s) through targeted retrieval.",
+    "Incorporate missing variables: financial_cost."
+  ],
+  "replan_triggered": true,
+  "iteration": 1,
+  "created_at": "2026-09-04T00:18:00Z",
+  "updated_at": "2026-09-04T00:18:00Z"
+}
+```
+
+**`POST /api/v1/queries/{query_id}/self-challenge`**
+*Description:* Executes the complete end-to-end self-challenge pipeline: generating competing hypotheses, running falsification passes, executing red-team critique, and triggering dynamic re-planning loops until confidence threshold or iteration limit is satisfied.
+*Request Body:*
+```json
+{
+  "max_replan_iterations": 3,
+  "confidence_threshold": 0.3
+}
+```
+*Response (HTTP 200 OK):*
+```json
+{
+  "query_id": "q_45678901-1234-5678-1234-567812345678",
+  "hypotheses": [
+    {
+      "id": "hyp-a1b2c3d4-1111-4000-8000-000000000001",
+      "query_id": "q_45678901-1234-5678-1234-567812345678",
+      "statement": "Primary assertion: System throughput scales linearly under microservice architecture.",
+      "status": "falsified",
+      "confidence": 0.25,
+      "supporting_claim_ids": ["c_123"],
+      "falsifying_claim_ids": ["c_129"],
+      "evidence_map": [],
+      "falsification_attempts": 2,
+      "max_falsification_attempts": 5,
+      "metadata_": {},
+      "created_at": "2026-09-04T00:10:00Z",
+      "updated_at": "2026-09-04T00:20:00Z"
+    }
+  ],
+  "critique_reports": [
+    {
+      "id": "crit-f9e8d7c6-5555-4000-8000-000000000001",
+      "query_id": "q_45678901-1234-5678-1234-567812345678",
+      "synthesis_snapshot": "Initial synthesis snapshot...",
+      "findings": ["Evidence Quality Issue: Claim c_123 depends on single source."],
+      "weak_evidence": [],
+      "missing_variables": [],
+      "overall_severity": "LOW",
+      "recommendations": ["Synthesis and evidence chain pass red-team audit cleanly."],
+      "replan_triggered": false,
+      "iteration": 2,
+      "created_at": "2026-09-04T00:22:00Z",
+      "updated_at": "2026-09-04T00:22:00Z"
+    }
+  ],
+  "replan_count": 1,
+  "final_status": "completed",
+  "finalized_with_caveats": false
+}
+```
+
 ## Event Streaming
 
 Use SSE (`GET /queries/{id}/stream` and `GET /documents/{id}/stream`) for real-time updates.
@@ -264,12 +532,17 @@ Use SSE (`GET /queries/{id}/stream` and `GET /documents/{id}/stream`) for real-t
 **Phase 4 SSE Document Event Types:**
 `document:status_changed`, `document:parsed`, `document:chunked`, `document:embedded`, `document:failed`.
 
-Example event:
+**Phase 5 SSE Self-Challenge Event Types:**
+`hypothesis:generated`, `hypothesis:falsification_started`, `hypothesis:falsified`, `critique:report_generated`, `replan:triggered`, `self_challenge:completed`.
+
+Example Phase 5 event:
 
 ```json
 {
-  "event_type": "document:status_changed",
-  "document_id": "12345678-1234-5678-1234-567812345678",
-  "status": "chunking"
+  "event_type": "replan:triggered",
+  "query_id": "q_45678901-1234-5678-1234-567812345678",
+  "iteration": 1,
+  "reason": "Red-team audit flagged overall_severity HIGH due to single-source claim c_123 and omitted factor financial_cost."
 }
 ```
+

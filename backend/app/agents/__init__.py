@@ -1,44 +1,31 @@
-from .base import AgentStatus, AgentConfig, AgentState, StepResult, BaseAgent
-from .tool_registry import ToolDefinition, ToolResult, ToolRegistry
-from .message_bus import AgentMessage, MessageBus
-from .llm_provider import Message, LLMResponse, LLMProvider, MockProvider, GeminiProvider, get_llm_provider
-from .supervisor import SupervisorAgent, SupervisorInput, SupervisorOutput
-from .research import ResearchAgent, ResearchInput, ResearchOutput
-from .retrieval import RetrievalAgent
-from .evidence import EvidenceAgent
-from .synthesis import SynthesisAgent
-from .adversarial import AdversarialAgent
-from .contradiction import ContradictionAgent
-from .graph import langgraph_app, create_langgraph_workflow
+"""Agents module exports."""
+from app.agents.base import BaseAgent, AgentConfig, AgentState, StepResult
+from app.agents.supervisor import SupervisorAgent
+from app.agents.research import ResearchAgent
+from app.agents.retrieval import RetrievalAgent
+from app.agents.evidence import EvidenceAgent
+from app.agents.fact_check import FactCheckAgent
+from app.agents.contradiction import ContradictionAgent
+from app.agents.synthesis import SynthesisAgent
+from app.agents.adversarial import AdversarialAgent
+from app.agents.hypothesis import HypothesisAgent
+from app.agents.falsification import FalsificationAgent
+from app.agents.critic import CriticAgent
 
 __all__ = [
-    "AgentStatus",
+    "BaseAgent",
     "AgentConfig",
     "AgentState",
     "StepResult",
-    "BaseAgent",
-    "ToolDefinition",
-    "ToolResult",
-    "ToolRegistry",
-    "AgentMessage",
-    "MessageBus",
-    "Message",
-    "LLMResponse",
-    "LLMProvider",
-    "MockProvider",
-    "GeminiProvider",
-    "get_llm_provider",
     "SupervisorAgent",
-    "SupervisorInput",
-    "SupervisorOutput",
     "ResearchAgent",
-    "ResearchInput",
-    "ResearchOutput",
     "RetrievalAgent",
     "EvidenceAgent",
+    "FactCheckAgent",
+    "ContradictionAgent",
     "SynthesisAgent",
     "AdversarialAgent",
-    "ContradictionAgent",
-    "langgraph_app",
-    "create_langgraph_workflow",
+    "HypothesisAgent",
+    "FalsificationAgent",
+    "CriticAgent",
 ]

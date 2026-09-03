@@ -188,6 +188,99 @@ curl http://localhost:6333/healthz
 ```
 Expected response: `{"title":"qdrant","status":"ok"}`.
 
+## Phase 5 Self-Challenge & Dynamic Re-planning Architecture
+
+Phase 5 introduces autonomous self-challenge mechanisms: competing hypothesis generation, active falsification audits, independent red-team critique, and dynamic graph re-planning.
+
+### 1. Self-Challenge Architecture & Workflow
+
+```mermaid
+flowchart TD
+    A["Synthesis Snapshot / Preliminary Findings"] --> B["HypothesisAgent"]
+    B -->|"Generates 3-7 Competing Hypotheses"| C["hypotheses Table"]
+    C --> D["FalsificationAgent"]
+    D -->|"Targeted Counter-Queries & Net-Weight Formula"| E["Updated Confidence & Evidence Map"]
+    E --> F["CriticAgent (Red-Team)"]
+    F -->|"Audit Evidence Quality, Coherence, Omissions, Bias"| G["critique_reports Table"]
+    G --> H{"Severity >= HIGH?"}
+    H -->|"Yes & Iterations < Max"| I["Dynamic Re-planning Loop"]
+    I -->|"Inject remediation sub-tasks"| J["Research & Fact-Check Nodes"]
+    J --> A
+    H -->|"No or Max Iterations Reached"| K["Final Synthesis with Calibrated Confidence & Caveats"]
+```
+
+### 2. Phase 5 Specialist Agents & Contracts
+
+All Phase 5 agents inherit from `BaseAgent` and strictly enforce Pydantic V2 input/output contracts (`app/agents/agent_contracts.py`):
+
+1. **`HypothesisAgent` (`app/agents/hypothesis.py`)**:
+   - **Purpose**: Decomposes a research query into 3–7 competing, falsifiable hypothesis items (Primary, Alternative, Null).
+   - **Contract**:
+     - Input: `HypothesisAgentInput(query_text: str, existing_claims: List[Dict], existing_sources: List[Dict])`
+     - Output: `HypothesisAgentOutput(hypotheses: List[HypothesisItem], investigation_priorities: List[str])`
+   - **Key Fields**: `statement`, `initial_confidence` (0.5), `discriminating_evidence_needed`.
+
+2. **`FalsificationAgent` (`app/agents/falsification.py`)**:
+   - **Purpose**: Formulates targeted disconfirming search queries (`"evidence disproving or refuting: ..."`), retrieves potential counter-evidence, and calculates net-weight updated confidence.
+   - **Contract**:
+     - Input: `FalsificationInput(hypothesis: HypothesisItem, research_context: str)`
+     - Output: `FalsificationOutput(hypothesis_id: str, evidence_items: List[Dict], updated_confidence: float, status_summary: str)`
+   - **Confidence Formula**:
+     $$\text{Net Weight Ratio} = \frac{\sum W_{\text{supports}} - \sum W_{\text{falsifies}}}{\sum W_{\text{supports}} + \sum W_{\text{falsifies}}}$$
+     Mapped linearly from $[-1, 1]$ to $[0, 1]$ and bounded to $[0.0, 1.0]$.
+
+3. **`CriticAgent` (`app/agents/critic.py`)**:
+   - **Purpose**: Independent red-team review auditing findings across 4 distinct dimensions without shared state during audit:
+     1. *Evidence Quality*: Single-source dependencies, low confidence ($< 0.60$), unverified status.
+     2. *Logical Coherence*: Reasoning validity and unstated assumptions.
+     3. *Completeness*: Omitted variables (e.g., `financial_cost`, `regulatory_compliance`, `risk_mitigation`).
+     4. *Bias Detection*: Confirmation bias ($100\%$ supported claims) and framing bias.
+   - **Contract**:
+     - Input: `CriticInput(synthesis: str, evidence_chain: List[Dict], hypotheses: List[HypothesisItem], claims: List[Dict])`
+     - Output: `CriticOutput(findings: List[str], weak_evidence: List[Dict], missing_variables: List[Dict], overall_severity: str, recommendations: List[str], replan_recommended: bool)`
+
+### 3. Database Table Schemas
+
+Phase 5 adds two primary database entities mapped via SQLAlchemy in `app.models.hypothesis` and `app.models.critique_report`:
+
+1. **`hypotheses` Table (`Hypothesis` model)**:
+   - `id`: UUID (PK, default `uuid4`)
+   - `query_id`: UUID (FK to `queries.id`, `ondelete="CASCADE"`, indexed)
+   - `statement`: Text (Non-null)
+   - `status`: String (Default `"proposed"`; enum: `proposed`, `active`, `supported`, `falsified`, `inconclusive`)
+   - `confidence`: Float (Default `0.5`)
+   - `supporting_claim_ids`: JSON (List of claim UUIDs)
+   - `falsifying_claim_ids`: JSON (List of claim UUIDs)
+   - `evidence_map`: JSON (List of `EvidenceMapItem` dicts)
+   - `falsification_attempts`: Integer (Default `0`)
+   - `max_falsification_attempts`: Integer (Default `5`)
+   - `metadata`: JSON (Additional metadata such as discriminating evidence lists)
+   - `created_at`, `updated_at`: TimestampMixin
+
+2. **`critique_reports` Table (`CritiqueReport` model)**:
+   - `id`: UUID (PK, default `uuid4`)
+   - `query_id`: UUID (FK to `queries.id`, `ondelete="CASCADE"`, indexed)
+   - `synthesis_snapshot`: Text (Non-null)
+   - `findings`: JSON (List of finding string summaries)
+   - `weak_evidence`: JSON (List of `WeakEvidenceItem` dicts)
+   - `missing_variables`: JSON (List of `MissingVariableItem` dicts)
+   - `overall_severity`: String (Default `"LOW"`; enum: `LOW`, `MEDIUM`, `HIGH`, `CRITICAL`)
+   - `recommendations`: JSON (List of actionable remediation recommendations)
+   - `replan_triggered`: Boolean (Default `False`)
+   - `iteration`: Integer (Default `1`)
+   - `created_at`, `updated_at`: TimestampMixin
+
+### 4. Dynamic Re-planning Workflow & Loop Controls
+
+The LangGraph orchestration engine (`app/agents/graph.py`) incorporates a dynamic feedback loop:
+
+1. **Evaluation**: Following `SynthesisAgent` and `CriticAgent` execution, the `should_replan` conditional edge evaluates the red-team critique report.
+2. **Trigger Condition**: If `overall_severity` is rated `HIGH` or `CRITICAL` (or `replan_recommended == True`) and current loop count is below `max_replan_iterations` (default `3`), `replan_triggered` is set to `True`.
+3. **Task Injection**: The loop-back action dynamically injects targeted research sub-tasks derived from `remediation` and `missing_variables` recommendations directly back into the `ResearchAgent` and `FactCheckAgent` queues.
+4. **Safety & Termination**:
+   - Loop iterations are strictly bounded by `max_replan_iterations`.
+   - If iteration limit is reached while severity remains elevated, the system finalizes synthesis marked with `finalized_with_caveats = True` and explicit risk warnings.
+
 ## Testing & Audit Commands
 
 **Backend:**
@@ -198,3 +291,4 @@ Expected response: `{"title":"qdrant","status":"ok"}`.
 **Frontend:**
 - Vite Production Build: `npm run build`
 - React Doctor Quality Audit: `npx react-doctor .` (Audited: **100/100 Great score**)
+

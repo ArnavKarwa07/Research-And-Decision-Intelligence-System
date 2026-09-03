@@ -36,7 +36,16 @@ class Settings(BaseSettings):
     log_level: str = 'info'
     cors_origins: list[str] = ['http://localhost:3000', 'http://localhost:5173']
     
+    # Phase 5: Self-Challenge & Critic Settings
+    hypothesis_min_count: int = 3
+    hypothesis_max_count: int = 7
+    max_falsification_attempts: int = 5
+    critic_severity_threshold: str = "HIGH"
+    critic_confidence_threshold: float = 0.3
+    max_replan_iterations: int = 3
+    
     model_config = SettingsConfigDict(env_file='.env', env_file_encoding='utf-8', extra='ignore')
+
 
 
 settings = Settings()
