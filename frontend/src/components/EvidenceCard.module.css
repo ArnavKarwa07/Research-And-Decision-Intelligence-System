@@ -1,0 +1,152 @@
+.card {
+  background: var(--bg-surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  margin-bottom: 12px;
+  box-shadow: var(--shadow-flat);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.card:hover {
+  border-color: var(--border-medium);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-card);
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.leftMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.typeChip {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: var(--radius-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.typeFact {
+  background: rgba(16, 185, 129, 0.12);
+  color: var(--accent-emerald);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.typeCalc {
+  background: rgba(56, 189, 248, 0.12);
+  color: var(--accent-cyan);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.typeInfer {
+  background: rgba(245, 158, 11, 0.12);
+  color: var(--accent-amber);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.typeAssume {
+  background: rgba(99, 102, 241, 0.12);
+  color: var(--accent-indigo);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+}
+
+.typePredict {
+  background: rgba(244, 63, 94, 0.12);
+  color: var(--accent-rose);
+  border: 1px solid rgba(244, 63, 94, 0.3);
+}
+
+.typeDefault {
+  background: var(--bg-surface-3);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-medium);
+}
+
+.qualityScore {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+
+.rightMeta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.confidenceGauge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gaugeTrack {
+  width: 50px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--bg-surface-3);
+  overflow: hidden;
+}
+
+.gaugeFill {
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--accent-cyan) 0%, var(--accent-emerald) 100%);
+}
+
+.confidenceVal {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.copyBtn {
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xs);
+  color: var(--text-secondary);
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  padding: 3px 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.copyBtn:hover {
+  background: var(--bg-surface-3);
+  color: var(--text-primary);
+  border-color: var(--border-medium);
+}
+
+.contentBody {
+  margin-bottom: 12px;
+}
+
+.evidenceText {
+  font-size: 0.92rem;
+  color: var(--text-primary);
+  line-height: 1.55;
+  font-weight: 400;
+}
+
+.cardFooter {
+  display: flex;
+  align-items: center;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border-subtle);
+}

@@ -1,0 +1,215 @@
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--bg-surface-low);
+  border-right: 1px solid var(--border-subtle);
+  padding: 16px 12px;
+  user-select: none;
+}
+
+.brandHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.logoMark {
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface-variant);
+  border: 1px solid var(--border-medium);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+}
+
+.radarIcon {
+  font-size: 1.1rem;
+}
+
+.brandInfo {
+  display: flex;
+  flex-direction: column;
+}
+
+.brandTitle {
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--text-primary);
+  line-height: 1.1;
+}
+
+.brandBadge {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: var(--accent-gold);
+  letter-spacing: 0.08em;
+  margin-top: 2px;
+}
+
+.actionContainer {
+  margin: 14px 0 16px 0;
+}
+
+.newSessionBtn {
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  color: var(--accent-gold);
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.newSessionBtn:hover {
+  background: rgba(245, 158, 11, 0.2);
+  border-color: var(--accent-gold);
+  color: #ffffff;
+  box-shadow: var(--shadow-glow-gold);
+}
+
+.plusIcon {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.sessionSection {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.sectionHeader {
+  margin-bottom: 8px;
+  color: var(--text-muted);
+  padding: 0 4px;
+}
+
+.sessionList {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-right: 2px;
+}
+
+.emptyState {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  padding: 16px 8px;
+  text-align: center;
+  font-style: italic;
+}
+
+.sessionCard {
+  width: 100%;
+  text-align: left;
+  padding: 10px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface-container);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.sessionCard:hover {
+  border-color: var(--border-medium);
+  transform: translateY(-1px);
+}
+
+.activeCard {
+  border-color: var(--accent-gold) !important;
+  background: var(--bg-surface-high) !important;
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.codeGroup {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.activeDot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent-emerald);
+  box-shadow: 0 0 6px var(--accent-emerald);
+}
+
+.sessionCode {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--accent-emerald);
+}
+
+.cardTime {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--text-muted);
+}
+
+.cardTitle {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.footer {
+  padding-top: 12px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.telemetryStatus {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: var(--bg-surface-container);
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border-subtle);
+}
+
+.statusDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-cyan);
+  box-shadow: 0 0 6px var(--accent-cyan);
+}
+
+.statusText {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: var(--accent-cyan);
+  letter-spacing: 0.04em;
+}

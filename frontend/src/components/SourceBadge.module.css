@@ -1,0 +1,42 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border-subtle);
+  color: var(--accent-cyan);
+  text-decoration: none;
+  font-size: 0.78rem;
+  transition: all 0.15s ease;
+}
+
+.badge:hover {
+  background: var(--bg-surface-3);
+  border-color: var(--border-accent);
+  color: #ffffff;
+}
+
+.linkIcon {
+  font-size: 0.75rem;
+}
+
+.title {
+  font-weight: 500;
+  white-space: nowrap;
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.domainTag {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.externalArrow {
+  font-size: 0.75rem;
+  opacity: 0.7;
+}
