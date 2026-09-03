@@ -33,12 +33,25 @@ POST /runs/{run_id}/approve
 POST /runs/{run_id}/cancel
 ```
 
-## Knowledge
+## Internal Knowledge & RAG (Phase 4)
+
+### Document Management Endpoints
 
 ```http
-POST /projects/{project_id}/documents
-GET /projects/{project_id}/documents
-POST /projects/{project_id}/search
+POST /api/v1/sessions/{session_id}/documents
+GET /api/v1/sessions/{session_id}/documents
+GET /api/v1/documents/{document_id}
+DELETE /api/v1/documents/{document_id}
+GET /api/v1/documents/{document_id}/chunks
+GET /api/v1/documents/{document_id}/stream
+```
+
+### Document Search Endpoints
+
+```http
+POST /api/v1/sessions/{session_id}/search/hybrid
+POST /api/v1/sessions/{session_id}/search/semantic
+POST /api/v1/sessions/{session_id}/search/keyword
 ```
 
 ## Evidence & Phase 3 Intelligence
@@ -151,6 +164,89 @@ GET /queries/{id}/evidence-graph
 }
 ```
 
+**`POST /api/v1/sessions/{session_id}/documents`**
+*Request:* `multipart/form-data` (file: `UploadFile`)
+*Response (HTTP 202 Accepted):*
+```json
+{
+  "id": "12345678-1234-5678-1234-567812345678",
+  "session_id": "87654321-4321-8765-4321-876543218765",
+  "filename": "annual_report_2025.pdf",
+  "mime_type": "application/pdf",
+  "file_path": "./uploads/documents/annual_report_2025.pdf",
+  "file_size": 2458900,
+  "file_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "status": "queued",
+  "error_message": null,
+  "chunk_count": 0,
+  "metadata_json": {},
+  "created_at": "2026-09-04T00:00:00Z",
+  "updated_at": "2026-09-04T00:00:00Z"
+}
+```
+
+**`GET /api/v1/documents/{document_id}`**
+*Response (HTTP 200 OK):*
+```json
+{
+  "id": "12345678-1234-5678-1234-567812345678",
+  "session_id": "87654321-4321-8765-4321-876543218765",
+  "filename": "annual_report_2025.pdf",
+  "mime_type": "application/pdf",
+  "file_path": "./uploads/documents/annual_report_2025.pdf",
+  "file_size": 2458900,
+  "file_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "status": "stored",
+  "error_message": null,
+  "chunk_count": 48,
+  "metadata_json": {"author": "Finance Team", "page_count": 12},
+  "created_at": "2026-09-04T00:00:00Z",
+  "updated_at": "2026-09-04T00:01:15Z"
+}
+```
+
+**`DELETE /api/v1/documents/{document_id}`**
+*Response (HTTP 200 OK):*
+```json
+{
+  "message": "Document 12345678-1234-5678-1234-567812345678 and related chunks/vectors deleted successfully"
+}
+```
+
+**`POST /api/v1/sessions/{session_id}/search/hybrid`**
+*Request Body:*
+```json
+{
+  "query": "What were the total Q3 operating expenses?",
+  "top_k": 5,
+  "alpha": 0.5,
+  "enable_reranking": true
+}
+```
+*Response (HTTP 200 OK):*
+```json
+{
+  "session_id": "87654321-4321-8765-4321-876543218765",
+  "query": "What were the total Q3 operating expenses?",
+  "search_type": "hybrid",
+  "total_results": 1,
+  "chunks": [
+    {
+      "id": "chk_9876",
+      "document_id": "12345678-1234-5678-1234-567812345678",
+      "chunk_index": 4,
+      "content": "Total operating expenses in Q3 amounted to $14.2M, representing a 5% decrease year-over-year.",
+      "content_hash": "a1b2c3d4e5f6...",
+      "token_count": 18,
+      "page_number": 6,
+      "section_heading": "Financial Operations",
+      "score": 0.94,
+      "citation": "[Doc: annual_report_2025.pdf, Page: 6, Chunk: 4]"
+    }
+  ]
+}
+```
+
 ## Decisions
 
 ```http
@@ -160,20 +256,20 @@ POST /runs/{run_id}/decision/feedback
 
 ## Event Streaming
 
-Use SSE (`GET /queries/{id}/stream`) initially for one-way UI updates.
-Use WebSockets when bidirectional live control is required.
+Use SSE (`GET /queries/{id}/stream` and `GET /documents/{id}/stream`) for real-time updates.
 
-**Phase 3 SSE Event Types Added:**
+**Phase 3 SSE Event Types:**
 `claim:extracted`, `claim:verified`, `contradiction:detected`, `contradiction:resolved`, `source:scored`, `evidence:graph_updated`.
+
+**Phase 4 SSE Document Event Types:**
+`document:status_changed`, `document:parsed`, `document:chunked`, `document:embedded`, `document:failed`.
 
 Example event:
 
 ```json
 {
-  "type": "contradiction:detected",
-  "query_id": "query_123",
-  "agent": "contradiction_agent",
-  "severity": "high",
-  "message": "Comparing two conflicting revenue figures"
+  "event_type": "document:status_changed",
+  "document_id": "12345678-1234-5678-1234-567812345678",
+  "status": "chunking"
 }
 ```

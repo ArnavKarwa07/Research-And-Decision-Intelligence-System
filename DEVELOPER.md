@@ -71,6 +71,123 @@ RADIS employs a strict set of rules for agent development to ensure reliability,
    - **`ProvenanceAgent`**: Builds the Evidence Graph engine.
    - **LangGraph Routing (`should_reverify`)**: Routes execution to additional verification loops if confidence is low or contradictions are severe.
 
+## Phase 4 RAG Pipeline Architecture & Extensibility
+
+Phase 4 equips RADIS with an internal document processing engine, vector database storage, and hybrid retrieval algorithms.
+
+### 1. RAG Pipeline Architecture
+
+```
+[Uploaded Document] 
+      │
+      ▼
+┌───────────────────────────┐
+│  DocumentParserFactory    │ ── (Parses PDF, DOCX, TXT, Markdown)
+└─────────────┬─────────────┘
+              │ Extract raw text & section metadata
+              ▼
+┌───────────────────────────┐
+│   SemanticChunker         │ ── (Parent-Child Hierarchical Chunking)
+└─────────────┬─────────────┘
+              │ Chunks & hierarchy
+              ▼
+┌───────────────────────────┐
+│     EmbeddingService      │ ── (Generates dense vector embeddings)
+└─────────────┬─────────────┘
+              │ 
+      ┌───────┴────────┐
+      ▼                ▼
+┌───────────┐    ┌───────────┐
+│  Qdrant   │    │  BM25     │
+│ (Dense)   │    │ (Sparse)  │
+└─────┬─────┘    └─────┬─────┘
+              │                │
+              └───────┬────────┘
+                      ▼
+┌───────────────────────────┐
+│ Reciprocal Rank Fusion    │ ── (RRF combining Dense + Sparse search)
+└─────────────┬─────────────┘
+              ▼
+┌───────────────────────────┐
+│  Cross-Encoder Reranker   │ ── (Multi-stage precision score elevation)
+└─────────────┬─────────────┘
+              ▼
+┌───────────────────────────┐
+│     CitationMapper        │ ── (Source Attribution: [Doc: name, Page: X])
+└───────────────────────────┘
+```
+
+The key modules in `app/rag` perform:
+1. **Multi-Format Document Parsing (`app/rag/parsers`)**: Selects appropriate parser via `DocumentParserFactory` based on MIME type or file extension.
+2. **Hierarchical Semantic Chunking (`app/rag/chunking`)**: `SemanticChunker` splits document content into macro parent chunks and granular child chunks, preserving section headings, page numbers, and offsets.
+3. **Qdrant Vector Store (`app/rag/vector`)**: `QdrantClientManager` handles collection provisioning, vector upserts with payload metadata, payload filtering by session ID, and collection cleanup.
+4. **BM25 Keyword Engine (`app/rag/search/bm25_engine.py`)**: Computes sparse BM25 scores over chunk corpora for exact lexical and keyword matches.
+5. **Hybrid Search & RRF (`app/rag/search/hybrid_search.py`, `rrf.py`)**: Combines dense Qdrant vector scores and sparse BM25 keyword scores using Reciprocal Rank Fusion (RRF) parameterized by `alpha`.
+6. **Cross-Encoder Reranking (`app/rag/search/reranker.py`)**: Rescores candidate chunks against search query using cross-encoder scoring.
+7. **Citation Mapping (`app/rag/citations/citation_mapper.py`)**: Attaches structured citation references (`[Doc: filename, Page: X, Chunk: Y]`) to chunk payloads injected into LLM context windows.
+
+### 2. Parser Factory Extensibility Guide
+
+To add support for a new document format (e.g. `CSVParser` or `HTMLParser`):
+
+1. **Implement `BaseDocumentParser` Subclass**:
+   Create a new file in `app/rag/parsers/my_parser.py`:
+   ```python
+   from app.rag.parsers.base import BaseDocumentParser, ParsedDocument
+
+   class MyCustomParser(BaseDocumentParser):
+       async def parse(self, file_path: str) -> ParsedDocument:
+           # Extract text content, page divisions, sections, and metadata
+           return ParsedDocument(
+               content="Extracted full document text...",
+               metadata={"format": "custom"},
+               pages=[{"page_number": 1, "text": "..."}],
+               sections=[{"title": "Header", "start_offset": 0}]
+           )
+   ```
+
+2. **Register Parser in `DocumentParserFactory`**:
+   Update `app/rag/parsers/factory.py`:
+   ```python
+   _MIME_MAP: dict[str, Type[BaseDocumentParser]] = {
+       ...
+       "application/x-custom": MyCustomParser,
+   }
+
+   _EXTENSION_MAP: dict[str, Type[BaseDocumentParser]] = {
+       ...
+       ".custom": MyCustomParser,
+   }
+   ```
+
+3. **Add Tests**:
+   Add unit tests in `tests/unit/test_phase4_rag.py` to verify factory registration, text extraction, and metadata assignment.
+
+### 3. Instructions for Running Qdrant Locally
+
+**Option 1: Docker Compose (Recommended)**
+Start Qdrant container alongside PostgreSQL and Redis:
+```bash
+docker-compose up -d qdrant
+```
+- REST API: `http://localhost:6333`
+- Web Dashboard: `http://localhost:6333/dashboard`
+- gRPC Port: `6334`
+
+**Option 2: Standalone Docker Container**
+```bash
+docker run -d -p 6333:6333 -p 6334:6334 \
+    -v qdrant_data:/qdrant/storage \
+    --name radis-qdrant \
+    qdrant/qdrant:latest
+```
+
+**Checking Service Status:**
+```bash
+curl http://localhost:6333/healthz
+```
+Expected response: `{"title":"qdrant","status":"ok"}`.
+
 ## Testing & Audit Commands
 
 **Backend:**

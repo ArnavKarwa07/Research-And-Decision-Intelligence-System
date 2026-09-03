@@ -70,3 +70,65 @@ cd backend
 alembic revision --autogenerate -m "Phase 3 Evidence Intelligence additions"
 alembic upgrade head
 ```
+
+## Phase 4 Implemented Schema & Infrastructure Additions (Internal Knowledge + RAG)
+
+Phase 4 introduces internal document parsing, hierarchical semantic chunking, dense vector embeddings, and Qdrant integration.
+
+### 1. Vector Database Container Configuration (`docker-compose.yml`)
+
+Qdrant is configured as a dedicated container service in `docker-compose.yml`:
+
+```yaml
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+```
+
+A named volume `qdrant_data` is configured to persist vector index data across container restarts.
+
+### 2. Database Schema Additions (`Document`, `DocumentChunk`, `VectorCollection`)
+
+Phase 4 adds three core tables mapped via SQLAlchemy models in `app.models.document`:
+
+1. **`documents` Table (`Document` model):**
+   - Stores uploaded document records linked to a session (`session_id` FK).
+   - Columns: `id` (UUID, PK), `session_id` (FK to `sessions.id`), `filename` (String), `mime_type` (String), `file_path` (String), `file_size` (Integer), `file_hash` (String), `status` (Enum/String: `queued`, `parsing`, `chunking`, `embedding`, `stored`, `failed`), `error_message` (Text), `chunk_count` (Integer), `metadata_json` (JSON), `created_at` (DateTime), `updated_at` (DateTime).
+
+2. **`document_chunks` Table (`DocumentChunk` model):**
+   - Stores text chunks extracted from documents with parent-child hierarchical relations.
+   - Columns: `id` (UUID, PK), `document_id` (FK to `documents.id`), `chunk_index` (Integer), `content` (Text), `content_hash` (String, indexed), `token_count` (Integer), `page_number` (Integer, nullable), `section_heading` (String, nullable), `start_offset` (Integer), `end_offset` (Integer), `parent_chunk_id` (FK to `document_chunks.id`, self-reference), `embedding_id` (String, nullable), `metadata_json` (JSON), `created_at` (DateTime).
+
+3. **`vector_collections` Table (`VectorCollection` model):**
+   - Tracks session vector collections provisioned in Qdrant.
+   - Columns: `id` (UUID, PK), `session_id` (FK to `sessions.id`), `name` (String, unique), `dimension` (Integer), `distance_metric` (String, default `cosine`), `chunk_count` (Integer), `created_at` (DateTime).
+
+### 3. Environment Variable Settings
+
+Configure the following environment variables in `.env` or system environment (`app/config.py`):
+
+| Variable | Default Value | Description |
+| :--- | :--- | :--- |
+| `QDRANT_URL` | `http://localhost:6333` | Connection URL for Qdrant REST service |
+| `QDRANT_API_KEY` | `None` | Optional API key for authenticated Qdrant instances |
+| `EMBEDDING_PROVIDER` | `mock` | Dense embedding provider (`mock`, `openai`, `huggingface`) |
+| `EMBEDDING_MODEL` | `text-embedding-3-small` | Model name for vector embeddings |
+| `EMBEDDING_DIMENSION` | `1536` | Embedding vector dimensionality |
+| `CHUNK_SIZE` | `512` | Target token limit per document chunk |
+| `CHUNK_OVERLAP` | `64` | Token overlap between adjacent chunks |
+| `MAX_UPLOAD_SIZE_MB` | `50` | Maximum file upload size limit (in MB) |
+| `DOCUMENT_STORAGE_PATH` | `./uploads/documents` | Server disk directory for original uploaded documents |
+
+### Migration Execution (Phase 4)
+
+To apply the Phase 4 schema additions to local SQLite/PostgreSQL:
+
+```bash
+cd backend
+alembic revision --autogenerate -m "Phase 4 Internal Knowledge + RAG additions"
+alembic upgrade head
+```

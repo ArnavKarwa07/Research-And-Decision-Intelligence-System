@@ -94,3 +94,7 @@ def emit_source_stale(query_id: UUID, source_data: dict[str, Any]):
 def emit_evidence_graph_updated(query_id: UUID, graph_data: dict[str, Any]):
     stream_service.publish(query_id, StreamEvent(event_type="evidence:graph_updated", data=graph_data, timestamp=datetime.now()))
 
+def emit_document_status_updated(document_id: UUID, document_data: dict[str, Any]):
+    stream_service.publish(document_id, StreamEvent(event_type="document:status_updated", data=document_data, timestamp=datetime.now()))
+
+

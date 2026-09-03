@@ -6,6 +6,12 @@ from sqlalchemy.dialects.postgresql import UUID
 
 from app.models.base import Base, TimestampMixin
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.models.query import Query
+    from app.models.document import Document
+
 class Session(TimestampMixin, Base):
     """Database model for a research session."""
     
@@ -27,3 +33,9 @@ class Session(TimestampMixin, Base):
         back_populates="session",
         cascade="all, delete-orphan"
     )
+    documents: Mapped[list["Document"]] = relationship(
+        "Document",
+        back_populates="session",
+        cascade="all, delete-orphan"
+    )
+

@@ -13,6 +13,7 @@ from .contradiction import (
     ContradictionResponse, ContradictionResolveRequest
 )
 from .source_group import SourceGroupType, SourceGroupResponse
+from .document import DocumentResponse, DocumentChunkResponse
 
 __all__ = [
     "ErrorResponse",
@@ -40,4 +41,7 @@ __all__ = [
     "ContradictionResolveRequest",
     "SourceGroupType",
     "SourceGroupResponse",
+    "DocumentResponse",
+    "DocumentChunkResponse",
 ]
+

@@ -19,6 +19,17 @@ class Settings(BaseSettings):
     google_search_engine_id: str = ''
     tavily_api_key: str = ''
     
+    # Qdrant & Embedding RAG settings
+    qdrant_url: str = "http://localhost:6333"
+    qdrant_api_key: str | None = None
+    embedding_provider: str = "mock"  # "openai", "huggingface", "mock"
+    embedding_model: str = "text-embedding-3-small"
+    embedding_dimension: int = 1536
+    chunk_size: int = 512
+    chunk_overlap: int = 64
+    max_upload_size_mb: int = 50
+    document_storage_path: str = "./uploads/documents"
+    
     backend_host: str = '0.0.0.0'
     backend_port: int = 8000
     backend_reload: bool = True

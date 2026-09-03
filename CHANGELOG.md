@@ -5,6 +5,19 @@ All notable changes to the Research And Decision Intelligence System (RADIS) wil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.0] - Phase 4 Release - 2026-09-04
+
+### Added (Phase 4 Internal Knowledge + RAG)
+- **Multi-Format Document Parser Engine**: Support for PDF, DOCX, TXT, and Markdown parsing via extensible `DocumentParserFactory` with metadata extraction (page numbers, section headings).
+- **Hierarchical Semantic Chunking**: Parent-child hierarchical chunking strategy maintaining structural document context and precise text token windows.
+- **Qdrant Dense Vector Store Integration**: Native Qdrant vector database client manager supporting per-session collection creation, dense payload storage, cosine distance index, and async vector deletion.
+- **BM25 Sparse Search Engine**: In-memory BM25 ranker for lexical keyword matching over session document chunk corpora.
+- **Hybrid Search & Reciprocal Rank Fusion (RRF)**: Combined dense vector and sparse lexical retrieval using RRF scoring with configurable weight alpha.
+- **Cross-Encoder Reranking Engine**: Multi-stage reranking pipeline using cross-encoder scoring to elevate high-relevance chunks.
+- **Citation Mapping & Attribution**: Real-time document chunk citation tracking (`[Doc: filename, Page: X, Chunk: Y]`) and context payload injection into agent LLM prompts.
+- **Document Management & Search APIs**: RESTful ingestion, listing, chunking, SSE status streaming, and search endpoints (`/search/hybrid`, `/search/semantic`, `/search/keyword`).
+- **Database Schema Additions**: `Document`, `DocumentChunk`, and `VectorCollection` tables for tracking document lifecycle, chunk hierarchies, and vector storage metadata.
+
 ## [3.0.0] - 2026-09-03
 
 ### Added (Phase 3 Evidence Intelligence)

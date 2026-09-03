@@ -112,6 +112,8 @@ class AtomicClaim(BaseModel):
     source_url: Optional[str] = None
     source_title: Optional[str] = None
     excerpt: Optional[str] = None
+    citation: Optional[str] = None
+
 
 
 class EvidenceAgentInput(BaseModel):

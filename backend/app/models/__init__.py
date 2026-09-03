@@ -9,6 +9,7 @@ from .claim import Claim
 from .claim_source import ClaimSource
 from .source_group import SourceGroup, SourceGroupMember
 from .contradiction import Contradiction
+from .document import Document, DocumentChunk, VectorCollection
 
 __all__ = [
     "Base",
@@ -22,4 +23,8 @@ __all__ = [
     "SourceGroup",
     "SourceGroupMember",
     "Contradiction",
+    "Document",
+    "DocumentChunk",
+    "VectorCollection",
 ]
+
