@@ -426,5 +426,72 @@ class MemoryAgentOutput(BaseModel):
     error_message: Optional[str] = None
 
 
+# --- Connector Agent Contract (Phase 13 Enterprise Connectors Engine) ---
+class ConnectorAgentInput(BaseModel):
+    """Input payload for ConnectorAgent executing data sync & vector embedding."""
+
+    connector_id: str = Field(..., description="Target EnterpriseConnector UUID")
+    workspace_id: str = Field(..., description="Target Workspace UUID")
+    sync_mode: str = Field(default="FULL_SYNC", description="FULL_SYNC, DELTA_SYNC, SINGLE_ITEM")
+    target_item_ids: Optional[List[str]] = Field(default=None, description="Specific external item IDs to sync")
+    allowed_tools: List[str] = Field(
+        default_factory=lambda: ["fetch_external_items", "chunk_text", "embed_qdrant", "update_sync_status"],
+        description="Allowed tool identifiers"
+    )
+    token_budget: int = Field(default=30000, description="Token budget allocated for run")
+    timeout_seconds: int = Field(default=300, description="Execution timeout in seconds")
+    retry_limit: int = Field(default=3, description="Max retries allowed on transient failure")
+
+
+class ConnectorAgentOutput(BaseModel):
+    """Output contract for ConnectorAgent execution."""
+
+    sync_job_id: str
+    connector_id: str
+    workspace_id: str
+    status: str = Field(..., description="COMPLETED, PARTIAL, FAILED, CANCELLED")
+    items_processed: int = 0
+    items_failed: int = 0
+    chunks_indexed: int = 0
+    vector_collection: Optional[str] = None
+    rate_limit_encountered: bool = False
+    stop_reason: str = Field(default="OBJECTIVE_SATISFIED", description="Reason execution stopped")
+    summary_message: str = ""
+    error_message: Optional[str] = None
+
+
+# --- Governance Agent Contract (Phase 13 Collaboration & Governance Engine) ---
+class GovernanceAgentInput(BaseModel):
+    """Input payload for GovernanceAgent performing RBAC audits & compliance checks."""
+
+    org_id: str = Field(..., description="Target Organization UUID")
+    workspace_id: Optional[str] = Field(None, description="Target Workspace UUID")
+    audit_scope: str = Field(default="FULL_COMPLIANCE_REPORT", description="PERMISSIONS_CHECK, AUDIT_LOG_INSPECTION, REVOCATION_AUDIT, FULL_COMPLIANCE_REPORT")
+    start_time: Optional[str] = Field(None, description="Start timestamp filter")
+    end_time: Optional[str] = Field(None, description="End timestamp filter")
+    allowed_tools: List[str] = Field(
+        default_factory=lambda: ["inspect_permissions", "query_audit_logs", "check_session_tokens"],
+        description="Allowed tool identifiers"
+    )
+    token_budget: int = Field(default=15000, description="Token budget allocated for run")
+    timeout_seconds: int = Field(default=120, description="Execution timeout in seconds")
+
+
+class GovernanceAgentOutput(BaseModel):
+    """Output contract for GovernanceAgent execution."""
+
+    audit_report_id: str
+    org_id: str
+    workspace_id: Optional[str] = None
+    total_events_scanned: int = 0
+    security_violations_detected: List[Dict[str, Any]] = Field(default_factory=list)
+    unauthorized_attempts_count: int = 0
+    compliance_score: float = Field(default=1.0, ge=0.0, le=1.0)
+    recommendations: List[str] = Field(default_factory=list)
+    stop_reason: str = Field(default="OBJECTIVE_SATISFIED", description="Reason execution stopped")
+    summary_message: str = ""
+
+
+
 
 

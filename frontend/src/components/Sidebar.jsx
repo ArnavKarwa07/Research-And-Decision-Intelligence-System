@@ -1,4 +1,5 @@
 import React from 'react';
+import TeamWorkspaceSelector from './TeamWorkspaceSelector';
 
 export default function Sidebar({
   sessions,
@@ -8,11 +9,13 @@ export default function Sidebar({
   activeTab = 'Plan',
   onSelectTab = null,
   unreadAlertsCount = 0,
+  activeWorkspaceId = 'default-workspace',
+  onSelectWorkspace = null,
 }) {
   return (
     <aside className="bg-surface-container-low text-primary font-body-main w-[280px] h-full flex-shrink-0 border-r border-outline-variant flex flex-col py-5 bg-grid-overlay relative z-40">
       {/* Header Section */}
-      <div className="px-6 mb-6 flex items-center justify-between">
+      <div className="px-6 mb-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-surface-variant border border-outline-variant flex items-center justify-center rounded">
             <span className="material-symbols-outlined text-primary">radar</span>
@@ -32,8 +35,16 @@ export default function Sidebar({
         )}
       </div>
 
+      {/* Team Workspace Switcher */}
+      {onSelectWorkspace && (
+        <TeamWorkspaceSelector
+          activeWorkspaceId={activeWorkspaceId}
+          onSelectWorkspace={onSelectWorkspace}
+        />
+      )}
+
       {/* Primary CTA */}
-      <div className="px-4 mb-4">
+      <div className="px-4 my-4">
         <button
           type="button"
           onClick={onNewSession}
@@ -44,11 +55,11 @@ export default function Sidebar({
         </button>
       </div>
 
-      {/* Continuous Intelligence Workspace Navigation Tabs */}
+      {/* Continuous Intelligence & Enterprise Workspace Navigation Tabs */}
       {onSelectTab && (
-        <div className="px-4 mb-4 space-y-1 font-mono text-xs" role="tablist" aria-label="Continuous Intelligence Navigation">
+        <div className="px-4 mb-4 space-y-1 font-mono text-xs" role="tablist" aria-label="Enterprise Intelligence Navigation">
           <h3 className="text-[10px] font-bold text-on-surface-variant mb-2 uppercase border-b border-outline-variant pb-1 tracking-wider">
-            Continuous Intelligence
+            Enterprise & Intelligence
           </h3>
           <button
             type="button"
@@ -86,8 +97,39 @@ export default function Sidebar({
             <span className="material-symbols-outlined text-sm">neurology</span>
             <span>Project Memory</span>
           </button>
+
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'Connectors'}
+            onClick={() => onSelectTab('Connectors')}
+            className={`w-full flex items-center gap-2 px-3 py-2 rounded transition-colors text-left font-bold cursor-pointer focus:outline-none focus:ring-2 focus:ring-cyber-cyan/50 ${
+              activeTab === 'Connectors'
+                ? 'bg-cyber-cyan/20 text-cyber-cyan border border-cyber-cyan/50 shadow'
+                : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-variant/40'
+            }`}
+          >
+            <span className="material-symbols-outlined text-sm">hub</span>
+            <span>Connectors Engine</span>
+          </button>
+
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'Governance'}
+            onClick={() => onSelectTab('Governance')}
+            className={`w-full flex items-center gap-2 px-3 py-2 rounded transition-colors text-left font-bold cursor-pointer focus:outline-none focus:ring-2 focus:ring-cyber-cyan/50 ${
+              activeTab === 'Governance'
+                ? 'bg-cyber-cyan/20 text-cyber-cyan border border-cyber-cyan/50 shadow'
+                : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-variant/40'
+            }`}
+          >
+            <span className="material-symbols-outlined text-sm">security</span>
+            <span>Admin Governance</span>
+          </button>
         </div>
       )}
+
 
       {/* Active Sessions List */}
       <div className="flex-1 overflow-y-auto px-4">

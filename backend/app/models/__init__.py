@@ -45,6 +45,20 @@ from app.models.project_memory import (
     ValidityStatus,
     HumanApprovalStatus,
 )
+from app.models.enterprise_connector import (
+    EnterpriseConnector,
+    ConnectorSyncJob,
+    ConnectorItemLog,
+)
+from app.models.rbac_governance import (
+    Organization,
+    Workspace,
+    User,
+    WorkspaceMember,
+    ProjectShare,
+    AuthTokenSession,
+    EnterpriseAuditLog,
+)
 
 __all__ = [
     "Base",
@@ -97,4 +111,15 @@ __all__ = [
     "MemoryType",
     "ValidityStatus",
     "HumanApprovalStatus",
+    "EnterpriseConnector",
+    "ConnectorSyncJob",
+    "ConnectorItemLog",
+    "Organization",
+    "Workspace",
+    "User",
+    "WorkspaceMember",
+    "ProjectShare",
+    "AuthTokenSession",
+    "EnterpriseAuditLog",
 ]
+

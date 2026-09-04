@@ -5,7 +5,31 @@ All notable changes to the Research And Decision Intelligence System (RADIS) wil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [13.0.0] - Phase 13 Release - 2026-09-05
+
+### Added (Phase 13 Enterprise Expansion)
+- **Enterprise Connectors Engine (`EnterpriseConnector`, `ConnectorSyncJob`, `ConnectorItemLog`, `BaseConnector`)**: Extensible connector framework supporting 5 enterprise data stores (**Google Drive**, **Notion**, **Slack**, **Gmail**, **SharePoint**). Features automated credential authorization (base64/AES-256 encrypted storage), differential polling/webhook sync, content-aware text chunking, and multi-tenant vector embedding into Qdrant knowledge bases (`enterprise_connectors_{workspace_id}`).
+- **Sync Health & Rate Limit Monitoring (`ConnectorSyncService`)**: Real-time connector job dispatching, health state tracking (`IDLE`, `SYNCING`, `PAUSED`, `ERROR`, `COMPLETED`), last sync timestamp, API rate limit status, items processed/failed metrics, and automatic retry handling.
+- **Fine-Grained Role-Based Access Control (`RBACService`, `Organization`, `Workspace`, `WorkspaceMember`, `ProjectShare`)**: 4-tier granular permission model (`OWNER`, `ADMIN`, `RESEARCHER`, `VIEWER`) regulating access across workspaces, tasks, memory stores, connectors, and audit logs with FastAPI dependency enforcement (`RBACService.has_permission`).
+- **Single Sign-On & Token Session Revocation (`SSOAuthService`, `AuthTokenSession`)**: Enterprise SSO authentication supporting Google, Azure AD, Okta, SAML 2.0, and a built-in Mock Enterprise IdP endpoint (`/api/v1/auth/sso/mock-idp`). Issues SHA-256 hashed JWT sessions with instant token revocation blacklist capabilities (`revoke_session`).
+- **Immutable Organizational Audit Logging (`EnterpriseAuditService`, `EnterpriseAuditLog`)**: Immutable compliance logging engine recording data access events, connector sync jobs, RBAC role changes, SSO logins, and admin governance overrides. Includes automatic PII scanning and redaction (`scan_and_redact_pii`).
+- **Specialized Phase 13 Subagents (`ConnectorAgent`, `GovernanceAgent`)**:
+  - `ConnectorAgent`: Specialized subagent handling data connector sync execution, chunking, and vector collection indexing.
+  - `GovernanceAgent`: Specialized subagent executing RBAC permission audits, workspace boundary security, and immutable compliance audit reports.
+- **Typed Agent Contracts & Pydantic Schemas (`agent_contracts.py`, `schemas/enterprise_connectors.py`, `schemas/rbac_auth.py`)**:
+  - `ConnectorAgentInput` / `ConnectorAgentOutput`
+  - `GovernanceAgentInput` / `GovernanceAgentOutput`
+  - `ConnectorCreate` / `ConnectorUpdate` / `ConnectorResponse`
+  - `SyncJobTriggerRequest` / `SyncJobResponse` / `ConnectorHealthStatus`
+  - `OrganizationCreate` / `OrganizationResponse` / `WorkspaceCreate` / `WorkspaceResponse`
+  - `WorkspaceMemberAdd` / `WorkspaceMemberUpdate` / `WorkspaceMemberResponse`
+  - `SSOLoginRequest` / `SSOCallbackRequest` / `TokenResponse`
+  - `AuditLogQueryFilter` / `EnterpriseAuditLogResponse`
+- **Enterprise REST APIs**: 14 new endpoints under `/api/v1/connectors/*`, `/api/v1/auth/*`, `/api/v1/workspaces/*`, and `/api/v1/governance/*`.
+- **Enterprise Research Workspace UI (`EnterpriseConnectorsWorkspace.jsx`, `GovernanceSecurityWorkspace.jsx`, `TeamWorkspaceSelector.jsx`, `HeaderAuthBar.jsx`)**: Full-featured React dashboards for connector configuration, sync health monitoring, RBAC member management, SSO authentication test flows, and audit log search.
+
 ## [12.0.0] - Phase 12 Release - 2026-09-05
+
 
 ### Added (Phase 12 Continuous Intelligence & Decision Monitoring)
 - **Continuous Research Monitoring Engine (`MonitoringJob`, `ResearchBaselineSnapshot`, `MonitoringExecutionLog`, `DecisionAlert`)**: Automated continuous tracking of research topics, market conditions, and decision assumptions. Supports CRON (5-field cron parsing), INTERVAL (in seconds), and EVENT_DRIVEN schedules with alert thresholds and webhook URL notifications.

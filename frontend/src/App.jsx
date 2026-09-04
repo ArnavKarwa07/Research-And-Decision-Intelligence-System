@@ -11,12 +11,16 @@ import ClaimsGraphTab from './components/ClaimsGraphTab';
 import ExportArtifactModal from './components/ExportArtifactModal';
 import MonitoringDashboard from './components/MonitoringDashboard';
 import ProjectMemoryWorkspace from './components/ProjectMemoryWorkspace';
+import EnterpriseConnectorsWorkspace from './components/EnterpriseConnectorsWorkspace';
+import GovernanceSecurityWorkspace from './components/GovernanceSecurityWorkspace';
+import HeaderAuthBar from './components/HeaderAuthBar';
 import { api } from './lib/api';
 import { connectToStream } from './lib/sse';
 
 export default function App() {
   const [sessions, setSessions] = useState([]);
   const [activeSessionId, setActiveSessionId] = useState(null);
+  const [activeWorkspaceId, setActiveWorkspaceId] = useState('default-workspace');
   const [currentQuery, setCurrentQuery] = useState(null);
 
   const [isResearching, setIsResearching] = useState(false);
@@ -28,7 +32,7 @@ export default function App() {
   const [contradictions, setContradictions] = useState([]);
   const [graphData, setGraphData] = useState({ nodes: [], edges: [], stats: {} });
   
-  // Phase 12 Continuous Intelligence Navigation Workspace Tabs
+  // Phase 13 Enterprise Workspace Navigation Tabs
   const [activeTab, setActiveTab] = useState('Plan');
   const [unreadAlertsCount, setUnreadAlertsCount] = useState(2);
   const [errorMsg, setErrorMsg] = useState(null);
@@ -81,16 +85,13 @@ export default function App() {
         setErrorMsg(`Unable to connect to backend server: ${e.message}`);
       });
 
-    // Fetch active decision alerts count
     api.listDecisionAlerts()
       .then(alerts => {
         if (!isSubscribed || !alerts) return;
         const unread = alerts.filter(a => a.status === 'UNREAD' || a.status === 'TRIGGERED').length;
         setUnreadAlertsCount(unread);
       })
-      .catch(() => {
-        // Keep initial fallback count if offline
-      });
+      .catch(() => {});
 
     return () => {
       isSubscribed = false;
@@ -118,133 +119,68 @@ export default function App() {
     setIsResearching(true);
     setSteps([]);
     setEvidence([]);
+    setPlan([]);
+    setDecisionMatrix(null);
+    setClaims([]);
+    setContradictions([]);
     setErrorMsg(null);
-    if (activeTab === 'Monitoring' || activeTab === 'Project Memory') {
-      setActiveTab('Plan');
-    }
-
-    const initialStep = {
-      id: `step-${Date.now()}`,
-      message: `Decomposing research objective for ${mode === 'adversarial' ? 'adversarial stress-test' : 'deep investigation'}...`,
-      status: 'running',
-      timestamp: new Date().toISOString(),
-      agentType: 'Supervisor'
-    };
-    setSteps([initialStep]);
+    setActiveTab('Plan');
 
     try {
-      const query = await api.submitQuery(activeSessionId, text, mode);
-      setCurrentQuery(query);
+      const queryRes = await api.submitQuery(activeSessionId, text, mode);
+      setCurrentQuery(queryRes);
 
-      streamCleanupRef.current = connectToStream(query.id, {
-        onStep: (stepData) => {
-          setSteps(prev => {
-            const updated = prev.map(p => p.status === 'running' ? { ...p, status: 'completed' } : p);
-            return [...updated, {
-              id: stepData.id || `step-${Date.now()}-${Math.random()}`,
-              message: stepData.data?.message || 'Executing agent subtask...',
-              status: 'running',
-              timestamp: stepData.timestamp || new Date().toISOString(),
-              agentType: stepData.data?.agent_type || 'Agent'
-            }];
-          });
-        },
-        onComplete: (resultData) => {
-          setIsResearching(false);
-          setSteps(prev => prev.map(p => p.status === 'running' ? { ...p, status: 'completed' } : p));
-          if (resultData.data?.evidence) setEvidence(resultData.data.evidence);
-          if (resultData.data?.plan) setPlan(resultData.data.plan);
-          if (resultData.data?.decision_matrix) setDecisionMatrix(resultData.data.decision_matrix);
-          if (resultData.data?.claims) setClaims(resultData.data.claims);
-          if (resultData.data?.contradictions) setContradictions(resultData.data.contradictions);
-          if (resultData.data?.graphData) setGraphData(resultData.data.graphData);
-
-          if (streamCleanupRef.current) streamCleanupRef.current();
-          streamCleanupRef.current = null;
-        },
-        onPhase3Event: (eventType, data) => {
-          if (eventType.startsWith('claim:')) {
-            setClaims(prev => {
-              const existing = prev.find(c => c.id === data.id);
-              if (existing) return prev.map(c => c.id === data.id ? { ...c, ...data } : c);
-              return [...prev, data];
-            });
-          } else if (eventType.startsWith('contradiction:')) {
-            setContradictions(prev => {
-              const existing = prev.find(c => c.id === data.id);
-              if (existing) return prev.map(c => c.id === data.id ? { ...c, ...data } : c);
-              return [...prev, data];
-            });
-          } else if (eventType === 'evidence:graph_updated') {
-            setGraphData(data.graphData || data);
+      const cleanup = connectToStream(activeSessionId, {
+        onStep: (step) => {
+          setSteps(prev => [...prev, step]);
+          if (step.agentType === 'planner' && step.details?.plan) {
+            setPlan(step.details.plan);
           }
         },
-        onError: (err) => {
-          console.error('SSE Stream Error:', err);
+        onEvidence: (evidenceItem) => setEvidence(prev => [...prev, evidenceItem]),
+        onClaim: (claimItem) => setClaims(prev => [...prev, claimItem]),
+        onContradiction: (con) => setContradictions(prev => [...prev, con]),
+        onDecision: (matrix) => setDecisionMatrix(matrix),
+        onComplete: (data) => {
           setIsResearching(false);
-          setSteps(prev => {
-            const updated = prev.map(p => p.status === 'running' ? { ...p, status: 'failed' } : p);
-            return [...updated, {
-              id: `err-${Date.now()}`,
-              message: 'Research stream connection lost or interrupted.',
-              status: 'failed',
-              timestamp: new Date().toISOString(),
-              agentType: 'System'
-            }];
-          });
-          if (streamCleanupRef.current) streamCleanupRef.current();
-          streamCleanupRef.current = null;
-        }
+          if (data.decision_matrix) setDecisionMatrix(data.decision_matrix);
+        },
+        onError: (err) => {
+          console.error('Stream error:', err);
+          setErrorMsg(`Research run error: ${err.message}`);
+          setIsResearching(false);
+        },
       });
 
+      streamCleanupRef.current = cleanup;
     } catch (e) {
-      console.error('Failed to submit query:', e);
-      setIsResearching(false);
+      console.error('Failed to submit research query:', e);
       setErrorMsg(`Submission failed: ${e.message}`);
+      setIsResearching(false);
     }
   };
 
-  const activeSession = sessions.find(s => s.id === activeSessionId);
-  const breadcrumbText = currentQuery ? currentQuery.text : (activeSession?.title || 'New Research Workspace');
-
   return (
-    <div className="h-screen w-screen flex flex-col bg-surface text-on-surface font-body-main overflow-hidden">
-      {/* Top Application Bar Header */}
-      <header className="bg-surface/90 backdrop-blur-md h-16 w-full flex items-center justify-between px-6 border-b border-outline-variant shrink-0 z-50">
+    <div className="flex flex-col h-screen bg-surface-container-lowest text-primary overflow-hidden font-body-main">
+      <header className="h-14 border-b border-outline-variant bg-surface-container-low px-6 flex items-center justify-between shrink-0 z-50">
         <div className="flex items-center gap-4">
-          <span className="font-bold text-xl text-primary tracking-tight font-headline-md">RADIS</span>
-          <div className="h-4 w-px bg-outline-variant mx-2" />
-          <nav className="flex gap-2 font-mono text-xs uppercase items-center">
-            <span className="text-primary font-bold">Research Workspace</span>
-            <span className="text-outline-variant">/</span>
-            <span className="text-on-surface-variant truncate max-w-[280px]">
-              {breadcrumbText}
-            </span>
-          </nav>
-          <div className="ml-4 flex items-center gap-2 border border-cyber-cyan/30 rounded-full px-3 py-1 bg-cyber-cyan/10">
-            <div className="w-2 h-2 rounded-full bg-cyber-cyan animate-pulse-cyan shadow-[0_0_8px_rgba(56,189,248,0.6)]" />
-            <span className="font-mono text-[10px] text-cyber-cyan tracking-wider font-bold">
-              {isResearching ? 'LIVE AGENT WORKSTREAM' : 'ENTERPRISE WORKSPACE'}
-            </span>
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-primary text-xl font-bold">radar</span>
+            <span className="font-headline-md font-bold text-lg text-primary tracking-tight">RADIS</span>
           </div>
+          <span className="text-outline text-xs">|</span>
+          <span className="font-mono text-xs text-on-surface-variant bg-surface-variant/50 px-2 py-0.5 rounded">
+            Research & Decision Intelligence System (Phase 13)
+          </span>
         </div>
 
-        <div className="flex items-center gap-3">
-          {/* Decision Alerts Counter Badge Header Trigger */}
-          {unreadAlertsCount > 0 && (
-            <button
-              onClick={() => setActiveTab('Monitoring')}
-              className="flex items-center gap-1.5 bg-red-950/80 border border-red-500/80 px-3 py-1.5 rounded-lg text-xs font-mono text-red-300 font-bold hover:bg-red-900 transition-colors cursor-pointer shadow-md"
-            >
-              <span className="material-symbols-outlined text-red-400 text-sm animate-bounce">notifications_active</span>
-              <span>{unreadAlertsCount} Unread Alerts</span>
-            </button>
-          )}
-
+        <div className="flex items-center gap-4">
+          <HeaderAuthBar />
           <button
             type="button"
             onClick={() => setShowExportModal(true)}
-            className="bg-cyber-cyan text-black font-mono font-bold px-3.5 py-1.5 rounded-lg text-xs hover:bg-cyber-cyan/80 transition-colors cursor-pointer flex items-center gap-1.5 shadow-md"
+            disabled={!currentQuery}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-mono font-bold bg-cyber-cyan/10 text-cyber-cyan border border-cyber-cyan/30 hover:bg-cyber-cyan/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
           >
             <span className="material-symbols-outlined text-sm">download</span>
             Export Package (ZIP)
@@ -252,9 +188,7 @@ export default function App() {
         </div>
       </header>
 
-      {/* Main Application Shell */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Left Sidebar */}
         <Sidebar
           sessions={sessions}
           activeSessionId={activeSessionId}
@@ -263,9 +197,10 @@ export default function App() {
           activeTab={activeTab}
           onSelectTab={setActiveTab}
           unreadAlertsCount={unreadAlertsCount}
+          activeWorkspaceId={activeWorkspaceId}
+          onSelectWorkspace={setActiveWorkspaceId}
         />
 
-        {/* Center Workspace Canvas */}
         <main className="flex-1 flex flex-col overflow-hidden bg-surface relative">
           <section className="flex-1 flex flex-col relative z-10 p-6 overflow-y-auto max-w-6xl mx-auto w-full">
             {errorMsg && (
@@ -281,7 +216,6 @@ export default function App() {
               </div>
             )}
 
-            {/* View Tab Switcher Header Bar */}
             <div className="flex flex-wrap gap-2 border-b border-outline-variant mb-6 pb-2 text-xs font-mono font-bold shrink-0" role="tablist" aria-label="Research Workspace Views">
               {[
                 { id: 'Plan', label: '🗺️ Plan View' },
@@ -292,6 +226,8 @@ export default function App() {
                 { id: 'Claims Graph', label: '🕸️ Claims Graph' },
                 { id: 'Monitoring', label: `🛰️ Monitoring ${unreadAlertsCount > 0 ? `(${unreadAlertsCount})` : ''}` },
                 { id: 'Project Memory', label: '🧠 Project Memory' },
+                { id: 'Connectors', label: '🔌 Enterprise Connectors' },
+                { id: 'Governance', label: '🛡️ Admin Governance' },
               ].map(tab => (
                 <button
                   key={tab.id}
@@ -310,7 +246,6 @@ export default function App() {
               ))}
             </div>
 
-            {/* Standalone Workspace Tabs (Monitoring & Project Memory available anytime) */}
             {activeTab === 'Monitoring' ? (
               <div className="flex-1 overflow-y-auto pb-28">
                 <MonitoringDashboard
@@ -326,12 +261,22 @@ export default function App() {
                   activeQueryId={currentQuery?.id}
                 />
               </div>
+            ) : activeTab === 'Connectors' ? (
+              <div className="flex-1 overflow-y-auto pb-28">
+                <EnterpriseConnectorsWorkspace
+                  activeWorkspaceId={activeWorkspaceId}
+                />
+              </div>
+            ) : activeTab === 'Governance' ? (
+              <div className="flex-1 overflow-y-auto pb-28">
+                <GovernanceSecurityWorkspace
+                  activeWorkspaceId={activeWorkspaceId}
+                />
+              </div>
             ) : steps.length === 0 && evidence.length === 0 && claims.length === 0 ? (
               <EmptyHeroState onSubmitQuery={handleSubmitQuery} />
             ) : (
-              /* Enterprise Research Workspace Engine Views */
               <div className="flex-1 flex flex-col w-full h-full">
-                {/* Tab View Container */}
                 <div className="flex-1 overflow-y-auto pb-28">
                   {activeTab === 'Plan' && (
                     <PlanViewTab plan={plan} activeAgent={steps[steps.length - 1]?.agentType} steps={steps} />
@@ -369,7 +314,6 @@ export default function App() {
               </div>
             )}
 
-            {/* Floating Query Console Bar */}
             <QueryInput
               onSubmit={handleSubmitQuery}
               isLoading={isResearching}
