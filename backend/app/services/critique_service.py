@@ -36,18 +36,30 @@ class CritiqueService:
         logger.info(f"[CritiqueService] Initiating critique pass for query_id {query_id}")
 
         # Fetch query
-        result = await db.execute(select(Query).where(Query.id == query_id))
-        query = result.scalar_one_or_none()
+        if hasattr(db, "query"):
+            query = db.query(Query).filter(Query.id == query_id).first()
+        else:
+            result = await db.execute(select(Query).where(Query.id == query_id))
+            query = result.scalar_one_or_none()
+
         if not query:
             raise ValueError(f"Query with id {query_id} not found.")
 
         # Fetch associated claims
-        claims_res = await db.execute(select(Claim).where(Claim.query_id == query_id))
-        claims = claims_res.scalars().all()
+        if hasattr(db, "query"):
+            claims = db.query(Claim).filter(Claim.query_id == query_id).all()
+        else:
+            claims_res = await db.execute(select(Claim).where(Claim.query_id == query_id))
+            claims = claims_res.scalars().all()
 
         # Fetch associated evidence
-        ev_res = await db.execute(select(Evidence).where(Evidence.query_id == query_id))
-        evidence_list = ev_res.scalars().all()
+        if hasattr(db, "query"):
+            evidence_list = db.query(Evidence).filter(Evidence.query_id == query_id).all()
+        else:
+            ev_res = await db.execute(select(Evidence).where(Evidence.query_id == query_id))
+            evidence_list = ev_res.scalars().all()
+
+
 
         # Prepare CriticInput
         claims_data = [
@@ -99,8 +111,13 @@ class CritiqueService:
             iteration=iteration
         )
         db.add(report)
-        await db.commit()
-        await db.refresh(report)
+        commit_res = db.commit()
+        if hasattr(commit_res, "__await__"):
+            await commit_res
+        refresh_res = db.refresh(report)
+        if hasattr(refresh_res, "__await__"):
+            await refresh_res
+
 
         # Broadcast SSE telemetry
         event_type = "critic:replan_triggered" if replan_triggered else "critic:complete"

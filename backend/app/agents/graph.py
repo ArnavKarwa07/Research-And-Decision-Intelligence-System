@@ -43,6 +43,8 @@ class AgentState(TypedDict):
     fact_check_results: List[Dict[str, Any]]
     verification_loop_count: int
     decision_matrix: Optional[Dict[str, Any]]
+    data_analysis_results: Optional[Dict[str, Any]]
+    visualization_spec: Optional[Dict[str, Any]]
     search_queries: List[str]
     summary: str
     confidence: float
@@ -56,6 +58,7 @@ class AgentState(TypedDict):
     audit_issues: List[Dict[str, Any]]
     is_complete: bool
     current_step: int
+
 
 
 def get_langchain_llm() -> Optional[ChatGoogleGenerativeAI]:
@@ -519,6 +522,64 @@ async def decision_node(state: AgentState) -> Dict[str, Any]:
     }
 
 
+# --- Node 13: Data Node ---
+async def data_node(state: AgentState) -> Dict[str, Any]:
+    logger.info(f"[LangGraph Data Node] Investigating quantitative data for query: '{state['text']}'")
+    from app.agents.data_agent import DataInvestigationAgent
+    from app.agents.agent_contracts import DataAgentInput
+
+    agent = DataInvestigationAgent()
+    input_data = DataAgentInput(query=state["text"])
+    res = agent.run(input_data)
+
+    new_step = {
+        "id": f"step-{int(datetime.now().timestamp()*1000)}-data",
+        "agent_type": "Data Agent",
+        "message": f"Data investigation completed. Executed SQL: '{res.sql_executed or 'None'}'. {res.row_count} rows retrieved.",
+        "status": "completed" if res.is_success else "failed",
+        "timestamp": datetime.now().isoformat()
+    }
+
+    return {
+        "data_analysis_results": res.model_dump(),
+        "steps": state["steps"] + [new_step],
+        "current_step": state["current_step"] + 1
+    }
+
+
+# --- Node 14: Visualization Node ---
+async def visualization_node(state: AgentState) -> Dict[str, Any]:
+    logger.info("[LangGraph Visualization Node] Programmatically generating chart specs")
+    from app.agents.visualization_agent import DataVisualizationAgent
+    from app.agents.agent_contracts import DataVisualizationInput
+
+    data_res = state.get("data_analysis_results") or {}
+    rows = data_res.get("rows", [])
+    
+    agent = DataVisualizationAgent()
+    input_data = DataVisualizationInput(
+        query_id=state.get("query_id"),
+        title=f"Quantitative Analysis: {state['text'][:40]}",
+        data=rows,
+        chart_type="bar"
+    )
+    res = agent.run(input_data)
+
+    new_step = {
+        "id": f"step-{int(datetime.now().timestamp()*1000)}-vis",
+        "agent_type": "Data Visualization Agent",
+        "message": f"Chart specification generated ({res.key_findings[0] if res.key_findings else 'Chart ready'}).",
+        "status": "completed",
+        "timestamp": datetime.now().isoformat()
+    }
+
+    return {
+        "visualization_spec": res.model_dump(),
+        "steps": state["steps"] + [new_step],
+        "current_step": state["current_step"] + 1
+    }
+
+
 def should_replan(state: AgentState) -> str:
     """Conditional edge evaluating critic severity and replan budget circuit breaker."""
     severity = state.get("overall_severity", "LOW")
@@ -547,6 +608,8 @@ def create_langgraph_workflow():
     builder.add_node("falsification", falsification_node)
     builder.add_node("critic", critic_node)
     builder.add_node("decision", decision_node)
+    builder.add_node("data", data_node)
+    builder.add_node("visualization", visualization_node)
 
     builder.add_edge(START, "supervisor")
     builder.add_edge("supervisor", "research")
@@ -563,10 +626,13 @@ def create_langgraph_workflow():
     builder.add_edge("falsification", "critic")
     
     builder.add_conditional_edges("critic", should_replan)
-    builder.add_edge("decision", END)
+    builder.add_edge("decision", "data")
+    builder.add_edge("data", "visualization")
+    builder.add_edge("visualization", END)
 
     return builder.compile()
 
 
 langgraph_app = create_langgraph_workflow()
+
 

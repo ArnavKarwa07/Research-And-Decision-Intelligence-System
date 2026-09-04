@@ -33,7 +33,34 @@ POST /runs/{run_id}/approve
 POST /runs/{run_id}/cancel
 ```
 
+## Data Agent & Data Visualization (Phase 7)
+
+```http
+POST /api/v1/data/datasets/upload
+GET /api/v1/data/datasets/{dataset_id}/schema
+POST /api/v1/data/query
+POST /api/v1/data/analyze
+POST /api/v1/data/visualize
+GET /api/v1/data/artifacts/{query_id}
+```
+
+### Endpoints Overview
+
+1. `POST /api/v1/data/datasets/upload`
+   - Uploads a CSV or Excel dataset, ingests it into SQLite, profiles columns/types/stats, and returns metadata.
+2. `GET /api/v1/data/datasets/{dataset_id}/schema`
+   - Retrieves column schema and profiling stats for an uploaded dataset.
+3. `POST /api/v1/data/query`
+   - Executes a read-only SQL query with safety AST keyword validation and limit injection.
+4. `POST /api/v1/data/analyze`
+   - Executes a Python script in a secure sandbox with AST module whitelisting and timeout limits.
+5. `POST /api/v1/data/visualize`
+   - Programmatically generates Vega-Lite JSON visualization specifications, summary tables, and statistical key findings.
+6. `GET /api/v1/data/artifacts/{query_id}`
+   - Compiles SQL queries, Python scripts, chart configs, and execution logs into a reproducible analysis artifact.
+
 ## Internal Knowledge & RAG (Phase 4)
+
 
 ### Document Management Endpoints
 

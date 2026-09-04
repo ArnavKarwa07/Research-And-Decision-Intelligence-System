@@ -272,3 +272,42 @@ class CriticOutput(BaseModel):
     overall_severity: str = "LOW"
     recommendations: List[str] = Field(default_factory=list)
     replan_recommended: bool = False
+
+
+# --- Data Agent & Visualization Agent Contracts (Phase 7) ---
+class DataAgentInput(BaseModel):
+    query: str
+    dataset_id: Optional[str] = None
+    table_name: Optional[str] = None
+    sql_query: Optional[str] = None
+    python_script: Optional[str] = None
+    token_budget: int = 10000
+
+
+class DataAgentOutput(BaseModel):
+    is_success: bool
+    sql_executed: Optional[str] = None
+    rows: List[Dict[str, Any]] = Field(default_factory=list)
+    row_count: int = 0
+    statistical_summary: Optional[Dict[str, Any]] = None
+    python_stdout: str = ""
+    error_message: Optional[str] = None
+    execution_time_ms: float = 0.0
+
+
+class DataVisualizationInput(BaseModel):
+    query_id: Optional[str] = None
+    title: str
+    data: List[Dict[str, Any]] = Field(default_factory=list)
+    chart_type: str = "bar"
+    x_axis: Optional[str] = None
+    y_axis: Optional[str] = None
+    description: Optional[str] = None
+
+
+class DataVisualizationOutput(BaseModel):
+    spec_json: Dict[str, Any] = Field(default_factory=dict)
+    table_data: List[Dict[str, Any]] = Field(default_factory=list)
+    key_findings: List[str] = Field(default_factory=list)
+    reproducible_artifact_id: Optional[str] = None
+

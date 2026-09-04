@@ -5,7 +5,28 @@ All notable changes to the Research And Decision Intelligence System (RADIS) wil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.0.0] - Phase 7 Release - 2026-09-04
+
+### Added (Phase 7 Data Agent & Data Visualization)
+- **Data Investigation Agent (`DataInvestigationAgent`)**: Specialist subagent with typed contracts, AST safety guardrails, budget enforcement, and statistical breakdown.
+- **Read-Only SQL Tool (`SQLTool`)**: Safe read-only SQL query execution on SQLite/PostgreSQL with AST keyword validation, table schema inspection, and limit injection.
+- **CSV & Structured Data Tool (`CSVTool`)**: Native ingestion, parsing, data profiling, type inference, summary statistics, and automatic registration of uploaded CSV/XLSX files into SQLite tables.
+- **Sandboxed Python Analysis Engine (`PythonSandboxTool`)**: Isolated Python sandbox with AST security validation, restricted builtins, AST module whitelisting (`safe_import`), execution timeout, and automated statistical metrics (mean, median, stddev, percentiles, correlation, trend analysis).
+- **Chart Spec & Summary Table Tool (`ChartTool`)**: Programmatic generation of Vega-Lite JSON visualization specifications (bar, line, scatter, pie) and formatted summary tables with statistical findings.
+- **Data Visualization Agent (`DataVisualizationAgent`)**: Specialist agent for converting raw data into interactive charts, summary tables, and embedded visual takeaways.
+- **Data Models & Database Tables**: Added `UploadedDataset`, `DataQueryRecord`, `VisualizationSpec`, and `ReproducibleArtifact` models and tables.
+- **Data Analysis REST APIs**: 6 new endpoints under `/api/v1/data`:
+  - `POST /api/v1/data/datasets/upload`
+  - `GET /api/v1/data/datasets/{dataset_id}/schema`
+  - `POST /api/v1/data/query`
+  - `POST /api/v1/data/analyze`
+  - `POST /api/v1/data/visualize`
+  - `GET /api/v1/data/artifacts/{query_id}`
+- **Frontend Visualization Components**: `DataVisualizationCard.jsx` (interactive chart spec & summary table renderer) and `DataArtifactsModal.jsx` (reproducible execution artifacts inspector).
+- **LangGraph Integration**: Integrated `data_node` and `visualization_node` into the LangGraph state machine.
+
 ## [6.0.0] - Phase 6 Release - 2026-09-04
+
 
 ### Added (Phase 6 Decision Intelligence)
 - **Decision Framework (`DecisionAgent`)**: Structured multi-criteria decision analysis (MCDA) matrix, alternatives & criteria modeling, normalized weight calculation, risk tracking, and calibrated confidence scoring.

@@ -35,6 +35,18 @@ from .decision import (
     SensitivityRequest,
     ScenarioRequest,
 )
+from .data_analysis import (
+    SQLQueryRequest,
+    SQLQueryResponse,
+    TableColumnInfo,
+    DatasetProfileResponse,
+    StatisticalSummary,
+    PythonAnalysisRequest,
+    PythonAnalysisResponse,
+    ChartSpecRequest,
+    ChartSpecResponse,
+    ReproducibleArtifactResponse,
+)
 
 __all__ = [
     "ErrorResponse",
@@ -91,4 +103,15 @@ __all__ = [
     "DecisionListResponse",
     "SensitivityRequest",
     "ScenarioRequest",
+    "SQLQueryRequest",
+    "SQLQueryResponse",
+    "TableColumnInfo",
+    "DatasetProfileResponse",
+    "StatisticalSummary",
+    "PythonAnalysisRequest",
+    "PythonAnalysisResponse",
+    "ChartSpecRequest",
+    "ChartSpecResponse",
+    "ReproducibleArtifactResponse",
 ]
+

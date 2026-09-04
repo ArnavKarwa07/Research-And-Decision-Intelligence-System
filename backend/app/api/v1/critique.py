@@ -5,7 +5,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import get_db
+from app.models.query import Query
 from app.schemas.hypothesis import CritiqueReportResponse
+
 from app.services.critique_service import CritiqueService
 
 router = APIRouter()
@@ -33,13 +35,13 @@ async def get_critiques(
     db: AsyncSession = Depends(get_db)
 ):
     """Get all critique reports for a research query."""
-    from app.models.query import Query
-    from sqlalchemy import select
-    result = await db.execute(select(Query).where(Query.id == query_id))
-    query = result.scalar_one_or_none()
+    query = db.query(Query).filter(Query.id == query_id).first()
     if not query:
         raise HTTPException(status_code=404, detail="Query not found")
 
-    reports = await critique_service.get_critiques_by_query(db, query_id)
+    reports = critique_service.get_critiques_by_query(db, query_id)
+    if hasattr(reports, "__await__"):
+        reports = await reports
     return reports
+
 

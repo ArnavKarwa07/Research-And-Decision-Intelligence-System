@@ -13,6 +13,12 @@ from app.models.document import Document, DocumentChunk, VectorCollection
 from app.models.hypothesis import Hypothesis
 from app.models.critique_report import CritiqueReport
 from app.models.decision import Decision
+from app.models.data_analysis import (
+    UploadedDataset,
+    DataQueryRecord,
+    VisualizationSpec,
+    ReproducibleArtifact,
+)
 
 __all__ = [
     "Base",
@@ -33,4 +39,9 @@ __all__ = [
     "Hypothesis",
     "CritiqueReport",
     "Decision",
+    "UploadedDataset",
+    "DataQueryRecord",
+    "VisualizationSpec",
+    "ReproducibleArtifact",
 ]
+

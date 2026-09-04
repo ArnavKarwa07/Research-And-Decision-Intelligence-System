@@ -6,8 +6,9 @@ Welcome to the Research And Decision Intelligence System (RADIS) developer docum
 
 RADIS is structured as a monorepo containing a Python backend and a pure JavaScript Vite + React frontend styled 1-to-1 with the Stitch MCP Design System.
 
-- **Backend (`/backend`)**: Built with FastAPI and Python 3.12. It handles database interactions via async SQLAlchemy (supporting SQLite for local dev & PostgreSQL for production), orchestrates multi-agent workflows using a custom `BaseAgent` framework with an extended LangGraph conditional routing state machine (`should_reverify`), manages LLM interactions, and exposes REST endpoints and Server-Sent Events (SSE) streams.
-- **Frontend (`/frontend`)**: A pure JavaScript React application powered by Vite (running natively on **port 5173**). Rebuilt to align 1-to-1 with the Stitch MCP UI Prototype (`RADIS Decision Command Center`). Styled with Tailwind CSS, Google Material Symbols, micro-caps typography, radar hero animations, live telemetry stream timelines, and zero non-functional buttons or dummy fallbacks. Audited with `react-doctor` (**100/100 Great score**).
+- **Backend (`/backend`)**: Built with FastAPI and Python 3.12. It handles database interactions via async SQLAlchemy (supporting SQLite for local dev & PostgreSQL for production), orchestrates multi-agent workflows using a custom `BaseAgent` framework with an extended LangGraph conditional routing state machine (`should_reverify`, `should_replan`, `data_node`, `visualization_node`), manages LLM interactions, sandboxed Python code execution (`PythonSandboxTool`), safe SQL query inspection (`SQLTool`), CSV/Excel data profiling (`CSVTool`), chart spec generation (`ChartTool`), and exposes REST endpoints and SSE streams.
+- **Frontend (`/frontend`)**: A pure JavaScript React application powered by Vite (running natively on **port 5173**). Features interactive data visualization card (`DataVisualizationCard.jsx`) and reproducible execution artifacts inspector modal (`DataArtifactsModal.jsx`).
+
 
 ## Quickstart Guide
 

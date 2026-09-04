@@ -2,7 +2,24 @@
 
 This document outlines database migration strategies and provides a roadmap for transitioning the Research And Decision Intelligence System (RADIS) from Phase 1 to Phase 2.
 
+## Phase 7 Database Schema Additions (Data Agent & Visualization)
+
+Phase 7 introduces 4 new tables for data analysis, structured dataset ingestion, SQL/Python query execution logs, visualization specifications, and reproducible execution artifacts:
+
+- **`uploaded_datasets`**: Stores metadata, column types, row counts, and summary statistics for ingested CSV/XLSX files.
+- **`data_query_records`**: Logs SQL and Python sandbox query executions, row counts, and execution timings.
+- **`visualization_specs`**: Persists generated Vega-Lite JSON visualization specifications, formatted summary tables, and statistical key findings.
+- **`reproducible_artifacts`**: Bundles SQL queries, Python scripts, chart configs, and execution logs into reproducible analysis artifacts.
+
+To apply Phase 7 schema migrations:
+```bash
+cd backend
+alembic revision --autogenerate -m "Add Phase 7 tables: uploaded_datasets, data_query_records, visualization_specs, reproducible_artifacts"
+alembic upgrade head
+```
+
 ## Database Initialization (Phase 1)
+
 
 In Phase 1, RADIS utilizes **async SQLAlchemy** paired with **Alembic** for schema migrations.
 

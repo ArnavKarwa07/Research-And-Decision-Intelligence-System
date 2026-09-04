@@ -12,6 +12,8 @@ from app.agents.hypothesis import HypothesisAgent
 from app.agents.falsification import FalsificationAgent
 from app.agents.critic import CriticAgent
 from app.agents.decision import DecisionAgent
+from app.agents.data_agent import DataInvestigationAgent
+from app.agents.visualization_agent import DataVisualizationAgent
 
 __all__ = [
     "BaseAgent",
@@ -30,5 +32,8 @@ __all__ = [
     "FalsificationAgent",
     "CriticAgent",
     "DecisionAgent",
+    "DataInvestigationAgent",
+    "DataVisualizationAgent",
 ]
+
 
