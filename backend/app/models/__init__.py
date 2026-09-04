@@ -19,6 +19,9 @@ from app.models.data_analysis import (
     VisualizationSpec,
     ReproducibleArtifact,
 )
+from app.models.approval_gate import ApprovalGate, ApprovalGateStatus, RiskLevel
+from app.models.clarification import ClarificationQuestion, ClarificationStatus
+from app.models.audit_log import AuditLog
 
 __all__ = [
     "Base",
@@ -43,5 +46,12 @@ __all__ = [
     "DataQueryRecord",
     "VisualizationSpec",
     "ReproducibleArtifact",
+    "ApprovalGate",
+    "ApprovalGateStatus",
+    "RiskLevel",
+    "ClarificationQuestion",
+    "ClarificationStatus",
+    "AuditLog",
 ]
+
 

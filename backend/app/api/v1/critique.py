@@ -35,7 +35,13 @@ async def get_critiques(
     db: AsyncSession = Depends(get_db)
 ):
     """Get all critique reports for a research query."""
-    query = db.query(Query).filter(Query.id == query_id).first()
+    if isinstance(db, AsyncSession):
+        from sqlalchemy import select
+        res = await db.execute(select(Query).where(Query.id == query_id))
+        query = res.scalar_one_or_none()
+    else:
+        query = db.query(Query).filter(Query.id == query_id).first()
+
     if not query:
         raise HTTPException(status_code=404, detail="Query not found")
 

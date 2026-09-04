@@ -47,6 +47,23 @@ from .data_analysis import (
     ChartSpecResponse,
     ReproducibleArtifactResponse,
 )
+from .safety import (
+    ToolPermissionScope,
+    PIIRedactionRequest,
+    PIIRedactionResponse,
+    PromptInjectionCheckResult,
+    AuditLogEntry,
+)
+from .hitl import (
+    ApprovalGateCreate,
+    ApprovalGateResolution,
+    ApprovalGateResponse,
+    ClarificationQuestionCreate,
+    ClarificationAnswer,
+    ClarificationResponse,
+    EvidenceOverrideRequest,
+    AssumptionConfirmationRequest,
+)
 
 __all__ = [
     "ErrorResponse",
@@ -113,5 +130,19 @@ __all__ = [
     "ChartSpecRequest",
     "ChartSpecResponse",
     "ReproducibleArtifactResponse",
+    "ToolPermissionScope",
+    "PIIRedactionRequest",
+    "PIIRedactionResponse",
+    "PromptInjectionCheckResult",
+    "AuditLogEntry",
+    "ApprovalGateCreate",
+    "ApprovalGateResolution",
+    "ApprovalGateResponse",
+    "ClarificationQuestionCreate",
+    "ClarificationAnswer",
+    "ClarificationResponse",
+    "EvidenceOverrideRequest",
+    "AssumptionConfirmationRequest",
 ]
+
 

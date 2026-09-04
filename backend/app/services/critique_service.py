@@ -36,28 +36,28 @@ class CritiqueService:
         logger.info(f"[CritiqueService] Initiating critique pass for query_id {query_id}")
 
         # Fetch query
-        if hasattr(db, "query"):
-            query = db.query(Query).filter(Query.id == query_id).first()
-        else:
+        if isinstance(db, AsyncSession):
             result = await db.execute(select(Query).where(Query.id == query_id))
             query = result.scalar_one_or_none()
+        else:
+            query = db.query(Query).filter(Query.id == query_id).first()
 
         if not query:
             raise ValueError(f"Query with id {query_id} not found.")
 
         # Fetch associated claims
-        if hasattr(db, "query"):
-            claims = db.query(Claim).filter(Claim.query_id == query_id).all()
-        else:
+        if isinstance(db, AsyncSession):
             claims_res = await db.execute(select(Claim).where(Claim.query_id == query_id))
             claims = claims_res.scalars().all()
+        else:
+            claims = db.query(Claim).filter(Claim.query_id == query_id).all()
 
         # Fetch associated evidence
-        if hasattr(db, "query"):
-            evidence_list = db.query(Evidence).filter(Evidence.query_id == query_id).all()
-        else:
+        if isinstance(db, AsyncSession):
             ev_res = await db.execute(select(Evidence).where(Evidence.query_id == query_id))
             evidence_list = ev_res.scalars().all()
+        else:
+            evidence_list = db.query(Evidence).filter(Evidence.query_id == query_id).all()
 
 
 

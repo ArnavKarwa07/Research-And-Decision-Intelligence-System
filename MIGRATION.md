@@ -1,6 +1,65 @@
 # Migration Guide
 
-This document outlines database migration strategies and provides a roadmap for transitioning the Research And Decision Intelligence System (RADIS) from Phase 1 to Phase 2.
+This document outlines database migration strategies and provides a roadmap for transitioning the Research And Decision Intelligence System (RADIS) from Phase 1 to Phase 8.
+
+## Phase 8 Implemented Schema & Safety Additions (Human-in-the-Loop & Tool Security)
+
+Phase 8 introduces 3 new database tables for human approval gate management, interactive clarification questions, 5-minute auto-kill timeout tracking, user evidence/assumption overrides, and immutable security audit logging:
+
+1. **`approval_gates` Table (`ApprovalGate` model in `app.models.approval_gate`):**
+   - Tracks human approval gates required prior to executing high-risk agent tools (`python_sandbox`, `execute_sql_query`).
+   - Columns:
+     - `id`: String(36) UUID (Primary Key)
+     - `run_id`: String(36) (Foreign Key reference/index, non-null)
+     - `agent_id`: String(100) (Agent identifier, non-null)
+     - `tool_name`: String(100) (Target tool requested, non-null)
+     - `tool_args`: JSON (Sanitized tool argument parameters)
+     - `risk_level`: String(20) (Default `"high"`; enum: `low`, `medium`, `high`, `critical`)
+     - `description`: Text (Human-readable description of requested action)
+     - `status`: String(20) (Indexed; default `"pending"`; enum: `pending`, `approved`, `rejected`, `expired`)
+     - `user_feedback`: Text (Nullable; operator feedback or auto-kill message)
+     - `timeout_seconds`: Integer (Default `300` seconds / 5 minutes)
+     - `created_at`: DateTime (UTC timestamp)
+     - `resolved_at`: DateTime (Nullable; UTC timestamp when approved/rejected/expired)
+
+2. **`clarification_questions` Table (`ClarificationQuestion` model in `app.models.clarification`):**
+   - Stores interactive clarification questions emitted by agents to resolve task ambiguity.
+   - Columns:
+     - `id`: String(36) UUID (Primary Key)
+     - `run_id`: String(36) (Foreign Key reference/index, non-null)
+     - `agent_id`: String(100) (Agent identifier, non-null)
+     - `prompt`: Text (Clarification question prompt string)
+     - `options`: JSON (Nullable; list of suggested response choices)
+     - `answer`: Text (Nullable; user response string or auto-kill notice)
+     - `status`: String(20) (Indexed; default `"pending"`; enum: `pending`, `answered`, `expired`)
+     - `created_at`: DateTime (UTC timestamp)
+     - `resolved_at`: DateTime (Nullable; UTC timestamp when answered/expired)
+
+3. **`audit_logs` Table (`AuditLog` model in `app.models.audit_log`):**
+   - Provides immutable audit trail for security events, tool calls, approval gates, PII redactions, and prompt injection attempts.
+   - Columns:
+     - `id`: String(36) UUID (Primary Key)
+     - `run_id`: String(36) (Indexed, nullable)
+     - `agent_id`: String(100) (Indexed, nullable)
+     - `action_type`: String(100) (Indexed; e.g. `approval_requested`, `approval_auto_killed_timeout`, `prompt_injection_detected`)
+     - `severity`: String(20) (Indexed; default `"INFO"`; enum: `INFO`, `WARNING`, `ERROR`, `CRITICAL`)
+     - `details`: JSON (Sanitized details object with auto-redacted PII)
+     - `timestamp`: DateTime (Indexed UTC timestamp)
+
+### Migration Execution (Phase 8)
+
+To apply Phase 8 schema migrations to local SQLite/PostgreSQL:
+
+```bash
+cd backend
+alembic revision --autogenerate -m "Phase 8 HITL and Tool Security additions: approval_gates, clarification_questions, audit_logs"
+alembic upgrade head
+```
+
+### Backward Compatibility & Isolation
+
+- **Non-Breaking Additions**: All Phase 8 tables (`approval_gates`, `clarification_questions`, `audit_logs`) are decoupled standalone tables. Existing tables (`sessions`, `queries`, `claims`, `contradictions`, `documents`, `hypotheses`, `critique_reports`, `decisions`, `data_query_records`) remain 100% untouched.
+- **Graceful Fallbacks**: Workflows executing in automated backend modes operate without blocking unless high-risk tools or ambiguous prompts trigger approval or clarification requests.
 
 ## Phase 7 Database Schema Additions (Data Agent & Visualization)
 

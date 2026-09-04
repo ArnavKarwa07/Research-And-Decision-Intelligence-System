@@ -309,6 +309,76 @@ The `decisions` table (`app/models/decision.py`) tracks:
 - `expected_values` & `decision_triggers` JSON
 - Foreign key `query_id` referencing `queries.id` with `ON DELETE CASCADE`.
 
+## Phase 8 Human-in-the-Loop & Safety Framework Architecture
+
+Phase 8 introduces a comprehensive Human-in-the-Loop (HITL) and Security & Safety Framework that governs tool permissions, enforces approval gates, redacts PII, defends against indirect prompt injections, and logs immutable security audit events.
+
+```mermaid
+flowchart TD
+    A["Agent Tool Call / User Query"] --> B["GatekeeperAgent & SafetyAgent"]
+    B -->|"Tool Permission Check"| C{"Requires Approval?"}
+    C -->|"Yes (python_sandbox, execute_sql_query)"| D["HITL Approval Gate (pending)"]
+    D -->|"5-min (300s) Timeout Check"| E{"Operator Responded?"}
+    E -->|"Approved"| F["Execute Tool Safely"]
+    E -->|"Rejected / Auto-Killed Timeout"| G["Transition to EXPIRED / REJECTED & Log Audit Event"]
+    C -->|"No"| F
+    B -->|"Untrusted Retrieval Input"| H["Indirect Prompt Injection Scanner"]
+    H -->|"Neutralize patterns & Wrap XML"| I["<untrusted_content> Encapsulated Context"]
+    B -->|"Input / Output Data Stream"| J["PII Redaction Engine (Regex + Dict keys)"]
+    J -->|"Redact Emails, Tokens, Passwords"| K["Sanitized Audit Log & Agent Context"]
+```
+
+### 1. Approval Gates & 5-Minute Auto-Kill Timeouts
+
+- **Mechanism**: High-risk tool calls (such as code execution in `python_sandbox` or direct database mutations in `execute_sql_query`) trigger an `ApprovalGate` entry managed by `HITLService.create_approval_gate`.
+- **Status Lifecycle**: Gates move from `pending` to `approved`, `rejected`, or `expired`.
+- **5-Minute Auto-Kill Timeout**: To prevent agent execution threads from deadlocking when human operators are offline, `HITLService.check_and_apply_timeouts` checks all pending gates. Any gate older than `timeout_seconds` (default: **300 seconds / 5 minutes**) is automatically transitioned to `EXPIRED` status with user feedback `"Auto-killed by 5-minute timeout."` and an `approval_auto_killed_timeout` audit log event with `ERROR` severity.
+
+### 2. Interactive Clarification Questions
+
+- **Ambiguity Detection**: `GatekeeperAgent` analyzes incoming user query objectives for ambiguity keywords (e.g. `"do whatever"`, `"any option"`, `"choose for me"`, or character length $< 10$).
+- **Question & Options Flow**: When ambiguity is detected, `HITLService.create_clarification_question` generates a `ClarificationQuestion` containing a prompt and optional multiple-choice selection options.
+- **Timeout Management**: Pending clarification questions also enforce the 5-minute (300s) auto-kill timeout, ensuring workflow execution gracefully terminates or falls back if unanswered.
+
+### 3. Role-Based Tool Permission Scoping
+
+Agent roles are restricted via the `DEFAULT_ROLE_PERMISSIONS` matrix in `app/services/security_service.py`:
+
+| Agent Role | Allowed Tools | Denied Tools | Requires Approval |
+| :--- | :--- | :--- | :--- |
+| `research` | `web_search`, `content_extractor`, `summarize` | `python_sandbox`, `execute_sql_query` | None |
+| `data_agent` | `sql_schema_inspect`, `csv_inspect`, `chart_generate` | `web_search` | `python_sandbox`, `execute_sql_query` |
+| `supervisor` | `web_search`, `content_extractor`, `summarize`, `sql_schema_inspect`, `csv_inspect`, `chart_generate` | None | `python_sandbox`, `execute_sql_query` |
+
+Permissions are evaluated dynamically at runtime using `SecurityService.check_tool_permission(agent_role, tool_name)`.
+
+### 4. PII Detection & Redaction Engine
+
+- **Pattern Scanners**: `PII_PATTERNS` regex rules scan for sensitive data formats:
+  - `EMAIL`: Standard email pattern
+  - `PHONE`: International & US telephone numbers
+  - `SSN`: US Social Security Numbers (`\d{3}-\d{2}-\d{4}`)
+  - `API_TOKEN` & `BEARER_TOKEN`: Secret tokens and auth headers
+  - `PASSWORD_PARAM`: Key/value password parameters
+- **Recursive Scanning**: `SecurityService.scan_and_redact_pii(data)` recursively traverses strings, dictionaries, and arrays. Dict keys matching `password`, `secret`, `token`, or `api_key` are replaced with `[REDACTED_SECRET]`.
+- **Pre-Persistence Scrubbing**: All audit logs, tool arguments, and SSE log events undergo automatic PII scrubbing before database writes or client transmission.
+
+### 5. Indirect Prompt Injection Defense
+
+- **Attack Vector**: Untrusted web pages or parsed document chunks may contain malicious prompt injections attempting to hijack LLM instructions.
+- **Pattern Blocking**: `INJECTION_PATTERNS` detects heuristics including `ignore all previous instructions`, system prompt overrides, DAN mode jailbreaks, `<script>` tags, SQL deletion commands, and code execution builtins (`eval`, `exec`, `__import__`).
+- **Pattern Neutralization & Encapsulation**: Matches are replaced with `[BLOCKED_INJECTION_PATTERN: ...]`. The entire content payload is structurally isolated within explicit XML boundary tags:
+  ```xml
+  <untrusted_content source='web' injection_flagged='true'>
+  [BLOCKED_INJECTION_PATTERN: ignore all previous instructions] System instructions neutralized.
+  </untrusted_content>
+  ```
+
+### 6. Specialist Safety & Gatekeeper Agents
+
+- **`GatekeeperAgent` (`app/agents/gatekeeper_agent.py`)**: Subclass of `BaseAgent`. Evaluates task ambiguity, raises clarification questions, and checks tool permission gates.
+- **`SafetyAgent` (`app/agents/safety_agent.py`)**: Subclass of `BaseAgent`. Executes multi-layer safety scans (permissions, PII redaction, prompt injection defense, audit logging) across agent inputs and outputs.
+
 ## Testing & Audit Commands
 
 **Backend:**

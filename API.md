@@ -659,3 +659,262 @@ POST /api/v1/decisions/{decision_id}/scenarios
   "updated_at": "2026-09-04T01:15:00Z"
 }
 ```
+
+## Human-in-the-Loop & Safety Framework (Phase 8)
+
+### Endpoint Outline
+
+```http
+GET /api/v1/hitl/approvals
+POST /api/v1/hitl/approvals/{gate_id}/resolve
+GET /api/v1/hitl/clarifications
+POST /api/v1/hitl/clarifications/{question_id}/answer
+POST /api/v1/hitl/evidence/override
+POST /api/v1/hitl/assumptions/confirm
+
+GET /api/v1/safety/audit-logs
+GET /api/v1/safety/permissions
+POST /api/v1/safety/scan-pii
+POST /api/v1/safety/check-injection
+```
+
+### Endpoints Overview
+
+1. `GET /api/v1/hitl/approvals`
+   - Lists pending or filtered human approval gates. Automatically evaluates 5-minute timeout checks to expire stale pending gates.
+2. `POST /api/v1/hitl/approvals/{gate_id}/resolve`
+   - Resolves a pending approval gate with an operator decision (`approve`, `reject`, or `kill`) and optional user feedback.
+3. `GET /api/v1/hitl/clarifications`
+   - Lists clarification questions submitted by agents to resolve query ambiguity. Triggers 5-minute timeout checks.
+4. `POST /api/v1/hitl/clarifications/{question_id}/answer`
+   - Submits a user answer to a pending clarification question.
+5. `POST /api/v1/hitl/evidence/override`
+   - Allows operators to override verified claim evidence statuses (`supported`, `contradicted`, `inferred`, `unverified`) and attach notes.
+6. `POST /api/v1/hitl/assumptions/confirm`
+   - Confirms or rejects preliminary agent hypotheses/assumptions.
+7. `GET /api/v1/safety/audit-logs`
+   - Retrieves immutable security audit logs with filtering by `run_id`, `action_type`, `severity`, and `limit`.
+8. `GET /api/v1/safety/permissions`
+   - Retrieves active role-based tool capability permission matrix (`research`, `data_agent`, `supervisor`).
+9. `POST /api/v1/safety/scan-pii`
+   - Scans input text for sensitive PII (emails, phones, SSNs, API tokens, passwords) and returns redacted text.
+10. `POST /api/v1/safety/check-injection`
+    - Scans untrusted content for indirect prompt injections, jailbreaks, and dangerous payloads, returning risk score and XML-wrapped sanitized text.
+
+### JSON Examples
+
+**`GET /api/v1/hitl/approvals`**
+*Query Parameters:* `run_id` (optional), `status_filter` (optional, e.g. `pending`, `approved`, `expired`)
+*Response (HTTP 200 OK):*
+```json
+[
+  {
+    "id": "gate-12345678-aaaa-bbbb-cccc-111122223333",
+    "run_id": "run-88889999-4444-1111-2222-333344445555",
+    "agent_id": "data_agent",
+    "tool_name": "python_sandbox",
+    "tool_args": {
+      "code": "import pandas as pd\ndf = pd.read_csv('data.csv')\nprint(df.describe())"
+    },
+    "risk_level": "high",
+    "description": "High-risk Python sandbox code execution requesting human approval.",
+    "status": "pending",
+    "user_feedback": null,
+    "timeout_seconds": 300,
+    "created_at": "2026-09-04T19:00:00Z",
+    "resolved_at": null
+  }
+]
+```
+
+**`POST /api/v1/hitl/approvals/{gate_id}/resolve`**
+*Request Body:*
+```json
+{
+  "action": "approve",
+  "user_feedback": "Approved after reviewing code safety."
+}
+```
+*Response (HTTP 200 OK):*
+```json
+{
+  "id": "gate-12345678-aaaa-bbbb-cccc-111122223333",
+  "run_id": "run-88889999-4444-1111-2222-333344445555",
+  "agent_id": "data_agent",
+  "tool_name": "python_sandbox",
+  "tool_args": {
+    "code": "import pandas as pd\ndf = pd.read_csv('data.csv')\nprint(df.describe())"
+  },
+  "risk_level": "high",
+  "description": "High-risk Python sandbox code execution requesting human approval.",
+  "status": "approved",
+  "user_feedback": "Approved after reviewing code safety.",
+  "timeout_seconds": 300,
+  "created_at": "2026-09-04T19:00:00Z",
+  "resolved_at": "2026-09-04T19:02:15Z"
+}
+```
+
+**`GET /api/v1/hitl/clarifications`**
+*Query Parameters:* `run_id` (optional), `status_filter` (optional)
+*Response (HTTP 200 OK):*
+```json
+[
+  {
+    "id": "clar-98765432-bbbb-cccc-dddd-555566667777",
+    "run_id": "run-88889999-4444-1111-2222-333344445555",
+    "agent_id": "gatekeeper_agent",
+    "prompt": "The research objective is ambiguous. Please specify target focus area.",
+    "options": [
+      "Focus on financial metrics",
+      "Focus on technical architecture",
+      "Focus on market analysis"
+    ],
+    "answer": null,
+    "status": "pending",
+    "created_at": "2026-09-04T19:05:00Z",
+    "resolved_at": null
+  }
+]
+```
+
+**`POST /api/v1/hitl/clarifications/{question_id}/answer`**
+*Request Body:*
+```json
+{
+  "answer": "Focus on technical architecture"
+}
+```
+*Response (HTTP 200 OK):*
+```json
+{
+  "id": "clar-98765432-bbbb-cccc-dddd-555566667777",
+  "run_id": "run-88889999-4444-1111-2222-333344445555",
+  "agent_id": "gatekeeper_agent",
+  "prompt": "The research objective is ambiguous. Please specify target focus area.",
+  "options": [
+    "Focus on financial metrics",
+    "Focus on technical architecture",
+    "Focus on market analysis"
+  ],
+  "answer": "Focus on technical architecture",
+  "status": "answered",
+  "created_at": "2026-09-04T19:05:00Z",
+  "resolved_at": "2026-09-04T19:06:30Z"
+}
+```
+
+**`POST /api/v1/hitl/evidence/override`**
+*Request Body:*
+```json
+{
+  "claim_id": "c_12345678-aaaa-bbbb-cccc-000000000001",
+  "status": "supported",
+  "notes": "Verified against official Q3 SEC filing document.",
+  "weight_adjustment": 1.5
+}
+```
+*Response (HTTP 200 OK):*
+```json
+{
+  "message": "Claim evidence status successfully overridden.",
+  "claim_id": "c_12345678-aaaa-bbbb-cccc-000000000001",
+  "status": "supported"
+}
+```
+
+**`POST /api/v1/hitl/assumptions/confirm`**
+*Request Body:*
+```json
+{
+  "hypothesis_id": "hyp-a1b2c3d4-1111-4000-8000-000000000001",
+  "confirmed": true,
+  "user_notes": "Confirmed microservices traffic assumption with engineering lead."
+}
+```
+*Response (HTTP 200 OK):*
+```json
+{
+  "message": "Assumption updated successfully.",
+  "hypothesis_id": "hyp-a1b2c3d4-1111-4000-8000-000000000001",
+  "status": "confirmed"
+}
+```
+
+**`GET /api/v1/safety/audit-logs`**
+*Query Parameters:* `run_id` (optional), `action_type` (optional), `severity` (optional), `limit` (default: 50, max: 500)
+*Response (HTTP 200 OK):*
+```json
+[
+  {
+    "id": "audit-11112222-3333-4444-5555-666677778888",
+    "run_id": "run-88889999-4444-1111-2222-333344445555",
+    "agent_id": "data_agent",
+    "action_type": "approval_requested",
+    "severity": "WARNING",
+    "details": {
+      "gate_id": "gate-12345678-aaaa-bbbb-cccc-111122223333",
+      "tool_name": "python_sandbox",
+      "risk_level": "high",
+      "timeout_seconds": 300
+    },
+    "timestamp": "2026-09-04T19:00:00Z"
+  }
+]
+```
+
+**`GET /api/v1/safety/permissions`**
+*Query Parameters:* `agent_role` (optional, e.g. `research`, `data_agent`, `supervisor`)
+*Response (HTTP 200 OK):*
+```json
+{
+  "research": {
+    "allowed": ["web_search", "content_extractor", "summarize"],
+    "denied": ["python_sandbox", "execute_sql_query"],
+    "requires_approval": []
+  },
+  "data_agent": {
+    "allowed": ["sql_schema_inspect", "csv_inspect", "chart_generate"],
+    "denied": ["web_search"],
+    "requires_approval": ["python_sandbox", "execute_sql_query"]
+  },
+  "supervisor": {
+    "allowed": ["web_search", "content_extractor", "summarize", "sql_schema_inspect", "csv_inspect", "chart_generate"],
+    "denied": [],
+    "requires_approval": ["python_sandbox", "execute_sql_query"]
+  }
+}
+```
+
+**`POST /api/v1/safety/scan-pii`**
+*Request Body:*
+```json
+{
+  "text": "Contact user at alice@example.com or call +1-555-0199 with token sk_live_999888777666555444333."
+}
+```
+*Response (HTTP 200 OK):*
+```json
+{
+  "original_length": 98,
+  "sanitized_text": "Contact user at [REDACTED_EMAIL] or call [REDACTED_PHONE] with token [REDACTED_API_TOKEN].",
+  "redactions_count": 3,
+  "detected_types": ["EMAIL", "PHONE", "API_TOKEN"]
+}
+```
+
+**`POST /api/v1/safety/check-injection`**
+*Query Parameters:* `content` (required), `source_type` (default: `"web"`)
+*Response (HTTP 200 OK):*
+```json
+{
+  "is_injection_detected": true,
+  "risk_score": 0.7,
+  "flagged_patterns": [
+    "ignore\\s+all\\s+previous\\s+instructions",
+    "<script\\b[^>]*>"
+  ],
+  "sanitized_content": "<untrusted_content source='web' injection_flagged='True'>\n[BLOCKED_INJECTION_PATTERN: ignore\\s+all\\s+previous\\s+instructions] System instructions neutralized.\n[BLOCKED_INJECTION_PATTERN: <script\\b[^>]*>] alert('xss')</script>\n</untrusted_content>"
+}
+```
+```

@@ -14,6 +14,8 @@ from app.agents.critic import CriticAgent
 from app.agents.decision import DecisionAgent
 from app.agents.data_agent import DataInvestigationAgent
 from app.agents.visualization_agent import DataVisualizationAgent
+from app.agents.safety_agent import SafetyAgent
+from app.agents.gatekeeper_agent import GatekeeperAgent
 
 __all__ = [
     "BaseAgent",
@@ -34,6 +36,9 @@ __all__ = [
     "DecisionAgent",
     "DataInvestigationAgent",
     "DataVisualizationAgent",
+    "SafetyAgent",
+    "GatekeeperAgent",
 ]
+
 
 

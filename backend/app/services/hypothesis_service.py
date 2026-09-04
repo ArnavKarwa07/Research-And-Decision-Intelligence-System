@@ -20,13 +20,17 @@ class HypothesisService:
 
     async def generate_hypotheses(
         self,
-        db: AsyncSession,
+        db: Any,
         query_id: uuid.UUID
     ) -> list[Hypothesis]:
         """Generate competing hypotheses for a query via HypothesisAgent."""
-        stmt = select(Query).where(Query.id == query_id)
-        result = await db.execute(stmt)
-        query = result.scalar_one_or_none()
+        if isinstance(db, AsyncSession):
+            stmt = select(Query).where(Query.id == query_id)
+            result = await db.execute(stmt)
+            query = result.scalar_one_or_none()
+        else:
+            query = db.query(Query).filter(Query.id == query_id).first()
+
         if not query:
             raise ValueError(f"Query {query_id} not found")
 
@@ -58,24 +62,33 @@ class HypothesisService:
             db.add(hyp_obj)
             db_hypotheses.append(hyp_obj)
 
-        await db.commit()
-        for h in db_hypotheses:
-            await db.refresh(h)
+        if isinstance(db, AsyncSession):
+            await db.commit()
+            for h in db_hypotheses:
+                await db.refresh(h)
+        else:
+            db.commit()
+            for h in db_hypotheses:
+                db.refresh(h)
+
         return db_hypotheses
 
     async def get_hypotheses(
         self,
-        db: AsyncSession,
+        db: Any,
         query_id: uuid.UUID
     ) -> list[Hypothesis]:
         """Retrieve all hypotheses for a research query."""
-        stmt = select(Hypothesis).where(Hypothesis.query_id == query_id)
-        result = await db.execute(stmt)
-        return list(result.scalars().all())
+        if isinstance(db, AsyncSession):
+            stmt = select(Hypothesis).where(Hypothesis.query_id == query_id)
+            result = await db.execute(stmt)
+            return list(result.scalars().all())
+        else:
+            return db.query(Hypothesis).filter(Hypothesis.query_id == query_id).all()
 
     async def get_hypotheses_by_query(
         self,
-        db: AsyncSession,
+        db: Any,
         query_id: uuid.UUID
     ) -> list[Hypothesis]:
         """Alias for get_hypotheses for backward compatibility."""
@@ -83,24 +96,31 @@ class HypothesisService:
 
     async def get_hypothesis_by_id(
         self,
-        db: AsyncSession,
+        db: Any,
         hypothesis_id: uuid.UUID
     ) -> Hypothesis | None:
         """Retrieve a specific hypothesis by ID."""
-        stmt = select(Hypothesis).where(Hypothesis.id == hypothesis_id)
-        result = await db.execute(stmt)
-        return result.scalar_one_or_none()
+        if isinstance(db, AsyncSession):
+            stmt = select(Hypothesis).where(Hypothesis.id == hypothesis_id)
+            result = await db.execute(stmt)
+            return result.scalar_one_or_none()
+        else:
+            return db.query(Hypothesis).filter(Hypothesis.id == hypothesis_id).first()
 
     async def update_hypothesis(
         self,
-        db: AsyncSession,
+        db: Any,
         hypothesis_id: uuid.UUID,
         updates: dict[str, Any]
     ) -> Hypothesis:
         """Update a hypothesis record."""
-        stmt = select(Hypothesis).where(Hypothesis.id == hypothesis_id)
-        result = await db.execute(stmt)
-        hyp = result.scalar_one_or_none()
+        if isinstance(db, AsyncSession):
+            stmt = select(Hypothesis).where(Hypothesis.id == hypothesis_id)
+            result = await db.execute(stmt)
+            hyp = result.scalar_one_or_none()
+        else:
+            hyp = db.query(Hypothesis).filter(Hypothesis.id == hypothesis_id).first()
+
         if not hyp:
             raise ValueError(f"Hypothesis {hypothesis_id} not found")
 
@@ -112,8 +132,13 @@ class HypothesisService:
         if "evidence_map" in updates and updates["evidence_map"] is not None:
             hyp.confidence = self.recalculate_confidence(hyp.evidence_map or [])
 
-        await db.commit()
-        await db.refresh(hyp)
+        if isinstance(db, AsyncSession):
+            await db.commit()
+            await db.refresh(hyp)
+        else:
+            db.commit()
+            db.refresh(hyp)
+
         return hyp
 
     async def map_evidence(

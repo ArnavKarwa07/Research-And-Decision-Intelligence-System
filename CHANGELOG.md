@@ -5,6 +5,30 @@ All notable changes to the Research And Decision Intelligence System (RADIS) wil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [8.0.0] - Phase 8 Release - 2026-09-04
+
+### Added (Phase 8 Human-in-the-Loop & Safety Framework)
+- **Approval Gates & 5-Minute Auto-Kill Timeouts (`ApprovalGate`, `HITLService`)**: Asynchronous approval gate management for high-risk tools (`python_sandbox`, `execute_sql_query`). Includes an automated 5-minute (300s) auto-kill timeout mechanism (`check_and_apply_timeouts`) that transitions pending gates to `EXPIRED` status to prevent pipeline deadlocks.
+- **Clarification Questions (`ClarificationQuestion`)**: Interactive agent-to-user questioning workflow with optional multiple-choice response choices when research objectives are ambiguous or underspecified. Includes 5-minute timeout auto-kill.
+- **User Evidence Overrides & Assumption Confirmations**: REST services (`override_claim_evidence`, `confirm_hypothesis_assumption`) allowing human operators to manually correct claim verification statuses or confirm/reject preliminary hypothesis assumptions.
+- **Role-Based Tool Permission Scoping (`DEFAULT_ROLE_PERMISSIONS`, `SecurityService.check_tool_permission`)**: Fine-grained capability matrix mapping agent roles (`research`, `data_agent`, `supervisor`) to `allowed`, `denied`, and `requires_approval` tool access control lists.
+- **PII Detection & Redaction Engine (`PII_PATTERNS`, `scan_and_redact_pii`)**: Automated regex and structure scanning detecting and redacting Email, Phone, SSN, API Tokens, Bearer Tokens, and Secret Passwords across strings, dicts, and arrays before persistence or UI rendering.
+- **Indirect Prompt Injection & Jailbreak Defense (`INJECTION_PATTERNS`, `sanitize_untrusted_content`)**: Untrusted input scanner neutralizing prompt overrides, DAN mode jailbreaks, `<script>` tags, and dangerous code/SQL execution attempts with structural `<untrusted_content>` XML encapsulation.
+- **Security Audit Logging (`AuditLog`, `SecurityService.log_audit_event`)**: Immutable audit log storage tracking critical security events (`approval_requested`, `approval_auto_killed_timeout`, `clarification_requested`, `prompt_injection_detected`, etc.) with sanitized PII details.
+- **Specialist Safety Agents (`GatekeeperAgent`, `SafetyAgent`)**: Dedicated agents inheriting from `BaseAgent` for ambiguity detection, tool risk evaluation, PII redaction, and prompt injection defense.
+- **Database Tables (`approval_gates`, `clarification_questions`, `audit_logs`)**: SQLAlchemy ORM models with index optimization, JSON payload fields, and ISO 8601 timestamps.
+- **HITL & Safety REST APIs**: 10 new API endpoints under `/api/v1/hitl` and `/api/v1/safety`:
+  - `GET /api/v1/hitl/approvals`
+  - `POST /api/v1/hitl/approvals/{gate_id}/resolve`
+  - `GET /api/v1/hitl/clarifications`
+  - `POST /api/v1/hitl/clarifications/{question_id}/answer`
+  - `POST /api/v1/hitl/evidence/override`
+  - `POST /api/v1/hitl/assumptions/confirm`
+  - `GET /api/v1/safety/audit-logs`
+  - `GET /api/v1/safety/permissions`
+  - `POST /api/v1/safety/scan-pii`
+  - `POST /api/v1/safety/check-injection`
+
 ## [7.0.0] - Phase 7 Release - 2026-09-04
 
 ### Added (Phase 7 Data Agent & Data Visualization)

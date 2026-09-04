@@ -14,6 +14,8 @@ from app.api.v1 import (
     self_challenge,
     decisions,
     data_analysis,
+    hitl,
+    safety,
 )
 
 
@@ -33,5 +35,8 @@ api_v1_router.include_router(hypotheses.router)
 api_v1_router.include_router(self_challenge.router)
 api_v1_router.include_router(decisions.router)
 api_v1_router.include_router(data_analysis.router)
+api_v1_router.include_router(hitl.router)
+api_v1_router.include_router(safety.router)
+
 
 
