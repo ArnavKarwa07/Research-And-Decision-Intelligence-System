@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from app.models.contradiction import Contradiction
     from app.models.hypothesis import Hypothesis
     from app.models.critique_report import CritiqueReport
+    from app.models.decision import Decision
 
 class Query(TimestampMixin, Base):
     """Database model for a user query."""
@@ -79,3 +80,9 @@ class Query(TimestampMixin, Base):
         back_populates="query",
         cascade="all, delete-orphan"
     )
+    decisions: Mapped[list["Decision"]] = relationship(
+        "Decision",
+        back_populates="query",
+        cascade="all, delete-orphan"
+    )
+

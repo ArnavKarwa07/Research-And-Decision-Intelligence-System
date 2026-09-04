@@ -5,7 +5,25 @@ All notable changes to the Research And Decision Intelligence System (RADIS) wil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [6.0.0] - Phase 6 Release - 2026-09-04
+
+### Added (Phase 6 Decision Intelligence)
+- **Decision Framework (`DecisionAgent`)**: Structured multi-criteria decision analysis (MCDA) matrix, alternatives & criteria modeling, normalized weight calculation, risk tracking, and calibrated confidence scoring.
+- **Scenario Simulation Engine (`run_scenario`)**: Best-case (25%), Base-case (50%), and Worst-case (25%) outcome projections across competing options with probability distributions.
+- **Sensitivity Stress-Testing (`run_sensitivity`)**: Tipping point / crossover analysis detecting exact criteria weight thresholds where top-ranked recommendations flip.
+- **Expected Value Engine (`calculate_expected_value`)**: Probabilistic payoff calculation ($EV = \sum P_k \times V_{ik}$) for decision options under uncertainty.
+- **Decision Tripwires & Triggers (`DecisionTrigger`)**: Explicit event-driven conditions and thresholds that notify or necessitate recommendation re-evaluation.
+- **Database Table (`decisions`)**: Dedicated `decisions` table with full SQLAlchemy model (`Decision`), cascade deletion, and query relationship.
+- **Decision REST APIs**: 5 new endpoints for running, fetching, and re-running sensitivity/scenarios:
+  - `POST /api/v1/queries/{query_id}/decisions`
+  - `GET /api/v1/queries/{query_id}/decisions`
+  - `GET /api/v1/decisions/{decision_id}`
+  - `POST /api/v1/decisions/{decision_id}/sensitivity`
+  - `POST /api/v1/decisions/{decision_id}/scenarios`
+- **Frontend Decision Matrix UI Component (`DecisionMatrixCard.jsx`)**: Multi-tab UI displaying Executive Recommendation, Weighted Criteria Matrix, Best/Base/Worst Scenarios, Sensitivity Tipping Points, Expected Payoffs, and Decision Triggers.
+
 ## [5.0.0] - Phase 5 Release - 2026-09-04
+
 
 ### Added (Phase 5 Self-Challenge & Dynamic Re-planning)
 - **Alternative Hypothesis Engine (`HypothesisAgent`)**: Automatic generation of 3-7 competing, falsifiable hypotheses for any research query, tracked with confidence scores and discriminating evidence criteria.

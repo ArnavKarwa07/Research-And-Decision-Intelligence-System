@@ -176,3 +176,31 @@ alembic upgrade head
 - **Optional Relationships**: `Query.hypotheses` and `Query.critique_reports` relationships are defined with `cascade="all, delete-orphan"`, ensuring safe cleanup without affecting existing queries.
 - **Graceful Fallbacks**: Queries submitted in Phase 1-4 standard mode continue to execute cleanly without requiring hypothesis generation or red-team critique passes unless explicitly triggered via `/self-challenge` or `/critique` endpoints.
 
+## Phase 6 Implemented Schema & Decision Intelligence Additions
+
+Phase 6 introduces quantified decision support, multi-criteria decision matrices, best/base/worst scenario modeling, weight sensitivity stress-testing, expected value calculations, and decision triggers.
+
+### 1. Database Schema Additions (`Decision`)
+
+Phase 6 adds a dedicated `decisions` table mapped via SQLAlchemy model in `app.models.decision`:
+
+1. **`decisions` Table (`Decision` model):**
+   - Stores structured decision evaluation matrices, scenarios, sensitivity tipping points, and triggers linked to a research query (`query_id` FK).
+   - Columns: `id` (UUID, PK), `query_id` (FK to `queries.id`, `ondelete="CASCADE"`, indexed), `recommendation` (Text), `confidence` (Float), `rationale` (Text, nullable), `alternatives` (JSON), `criteria` (JSON), `weighted_matrix` (JSON), `scenarios` (JSON), `sensitivity_analysis` (JSON), `expected_values` (JSON), `key_risks` (JSON), `assumptions` (JSON), `decision_triggers` (JSON), `metadata` (JSON), `created_at` (DateTime), `updated_at` (DateTime).
+
+### 2. Migration Execution (Phase 6)
+
+To apply the Phase 6 schema additions to local SQLite/PostgreSQL:
+
+```bash
+cd backend
+alembic revision --autogenerate -m "Phase 6 Decision Intelligence additions"
+alembic upgrade head
+```
+
+### 3. Backward Compatibility Notes
+
+- **Non-Breaking Schema Extensions**: The `decisions` table references `queries.id` with `ON DELETE CASCADE`. Existing tables remain 100% untouched.
+- **Optional Relationship**: `Query.decisions` relationship is defined with `cascade="all, delete-orphan"`.
+
+

@@ -12,6 +12,7 @@ from app.models.evidence import Evidence
 from app.models.document import Document, DocumentChunk, VectorCollection
 from app.models.hypothesis import Hypothesis
 from app.models.critique_report import CritiqueReport
+from app.models.decision import Decision
 
 __all__ = [
     "Base",
@@ -31,4 +32,5 @@ __all__ = [
     "VectorCollection",
     "Hypothesis",
     "CritiqueReport",
+    "Decision",
 ]

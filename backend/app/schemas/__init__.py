@@ -21,6 +21,20 @@ from .hypothesis import (
     CritiqueReportResponse,
     SelfChallengeRequest, SelfChallengeResponse
 )
+from .decision import (
+    DecisionCriterion,
+    AlternativeOptionInput,
+    AlternativeOptionScored,
+    ScenarioDefinition,
+    ScenarioOutcome,
+    SensitivitySwitchPoint,
+    DecisionTrigger,
+    DecisionCreateRequest,
+    DecisionResponse,
+    DecisionListResponse,
+    SensitivityRequest,
+    ScenarioRequest,
+)
 
 __all__ = [
     "ErrorResponse",
@@ -65,4 +79,16 @@ __all__ = [
     "CritiqueReportResponse",
     "SelfChallengeRequest",
     "SelfChallengeResponse",
+    "DecisionCriterion",
+    "AlternativeOptionInput",
+    "AlternativeOptionScored",
+    "ScenarioDefinition",
+    "ScenarioOutcome",
+    "SensitivitySwitchPoint",
+    "DecisionTrigger",
+    "DecisionCreateRequest",
+    "DecisionResponse",
+    "DecisionListResponse",
+    "SensitivityRequest",
+    "ScenarioRequest",
 ]

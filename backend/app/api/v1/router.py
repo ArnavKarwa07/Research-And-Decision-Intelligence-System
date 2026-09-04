@@ -12,6 +12,7 @@ from app.api.v1 import (
     critique,
     hypotheses,
     self_challenge,
+    decisions,
 )
 
 api_v1_router = APIRouter(prefix="/api/v1", tags=["v1"])
@@ -27,3 +28,5 @@ api_v1_router.include_router(documents.router)
 api_v1_router.include_router(critique.router)
 api_v1_router.include_router(hypotheses.router)
 api_v1_router.include_router(self_challenge.router)
+api_v1_router.include_router(decisions.router)
+

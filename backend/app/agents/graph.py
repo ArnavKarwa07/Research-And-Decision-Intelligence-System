@@ -479,6 +479,46 @@ async def critic_node(state: AgentState) -> Dict[str, Any]:
     }
 
 
+from app.agents.decision import DecisionAgent
+
+# --- Node 12: Decision Agent Node (Phase 6) ---
+async def decision_node(state: AgentState) -> Dict[str, Any]:
+    logger.info("[LangGraph Decision Agent] Executing multi-criteria analysis, scenario simulations, & sensitivity stress-tests")
+    agent = DecisionAgent()
+    
+    # Prepare input for decision agent based on synthesized state
+    input_data = {
+        "alternatives": state.get("decision_matrix", {}).get("alternatives", []),
+        "criteria": [
+            {"id": "c1", "name": "Evidence Strength & Quality", "weight": 0.50},
+            {"id": "c2", "name": "Implementation Feasibility", "weight": 0.30},
+            {"id": "c3", "name": "Risk & Uncertainty Mitigation", "weight": 0.20}
+        ],
+        "scenarios": [
+            {"name": "Best Case", "probability": 0.25, "description": "Full evidence confirmation & low technical friction"},
+            {"name": "Base Case", "probability": 0.50, "description": "Baseline expected outcomes"},
+            {"name": "Worst Case", "probability": 0.25, "description": "Key assumptions invalidated or counter-evidence found"}
+        ]
+    }
+    
+    res = await agent.run(input_data)
+    
+    step_msg = f"Decision analysis complete. Recommendation: '{res.get('recommendation', '')}' ({int(res.get('confidence', 0.8)*100)}% confidence)."
+    new_step = {
+        "id": f"step-{int(datetime.now().timestamp()*1000)}-dec",
+        "agent_type": "Decision Agent",
+        "message": step_msg,
+        "status": "completed",
+        "timestamp": datetime.now().isoformat()
+    }
+
+    return {
+        "decision_matrix": res.get("decision_matrix", {}),
+        "steps": state["steps"] + [new_step],
+        "current_step": state["current_step"] + 1
+    }
+
+
 def should_replan(state: AgentState) -> str:
     """Conditional edge evaluating critic severity and replan budget circuit breaker."""
     severity = state.get("overall_severity", "LOW")
@@ -488,7 +528,7 @@ def should_replan(state: AgentState) -> str:
     if severity in ["HIGH", "CRITICAL"] and replan_count < max_replan:
         logger.info(f"[LangGraph Dynamic Re-plan Triggered] Severity: {severity}, Iteration: {replan_count + 1}/{max_replan}")
         return "research"
-    return END
+    return "decision"
 
 
 # --- Compile LangGraph Graph ---
@@ -506,6 +546,7 @@ def create_langgraph_workflow():
     builder.add_node("hypothesis", hypothesis_node)
     builder.add_node("falsification", falsification_node)
     builder.add_node("critic", critic_node)
+    builder.add_node("decision", decision_node)
 
     builder.add_edge(START, "supervisor")
     builder.add_edge("supervisor", "research")
@@ -522,8 +563,10 @@ def create_langgraph_workflow():
     builder.add_edge("falsification", "critic")
     
     builder.add_conditional_edges("critic", should_replan)
+    builder.add_edge("decision", END)
 
     return builder.compile()
 
 
 langgraph_app = create_langgraph_workflow()
+

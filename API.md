@@ -535,14 +535,100 @@ Use SSE (`GET /queries/{id}/stream` and `GET /documents/{id}/stream`) for real-t
 **Phase 5 SSE Self-Challenge Event Types:**
 `hypothesis:generated`, `hypothesis:falsification_started`, `hypothesis:falsified`, `critique:report_generated`, `replan:triggered`, `self_challenge:completed`.
 
-Example Phase 5 event:
+**Phase 6 SSE Decision Event Types:**
+`decision:evaluating`, `decision:scored`, `decision:sensitivity_calculated`, `decision:completed`.
 
-```json
-{
-  "event_type": "replan:triggered",
-  "query_id": "q_45678901-1234-5678-1234-567812345678",
-  "iteration": 1,
-  "reason": "Red-team audit flagged overall_severity HIGH due to single-source claim c_123 and omitted factor financial_cost."
-}
+## Decision Intelligence (Phase 6)
+
+### Endpoint Outline
+
+```http
+POST /api/v1/queries/{query_id}/decisions
+GET /api/v1/queries/{query_id}/decisions
+GET /api/v1/decisions/{decision_id}
+POST /api/v1/decisions/{decision_id}/sensitivity
+POST /api/v1/decisions/{decision_id}/scenarios
 ```
 
+### JSON Examples
+
+**`POST /api/v1/queries/{query_id}/decisions`**
+*Description:* Runs multi-criteria weighted scoring, scenario simulation (best/base/worst), sensitivity stress-testing, and expected value calculation for a query.
+*Request Body:*
+```json
+{
+  "query_id": "q_45678901-1234-5678-1234-567812345678",
+  "alternatives": [
+    {"id": "opt1", "name": "Option A: Monolithic Deployment", "pros": ["Lower initial complexity"], "cons": ["Scalability ceiling"]},
+    {"id": "opt2", "name": "Option B: Distributed Microservices", "pros": ["High scalability", "Fault isolation"], "cons": ["Operational overhead"]}
+  ],
+  "criteria": [
+    {"id": "c1", "name": "Cost Efficiency", "weight": 0.4},
+    {"id": "c2", "name": "System Scalability", "weight": 0.6}
+  ],
+  "scenarios": [
+    {"name": "Best Case", "probability": 0.25},
+    {"name": "Base Case", "probability": 0.50},
+    {"name": "Worst Case", "probability": 0.25}
+  ]
+}
+```
+*Response (HTTP 201 Created):*
+```json
+{
+  "id": "dec-11112222-3333-4444-5555-666677778888",
+  "query_id": "q_45678901-1234-5678-1234-567812345678",
+  "recommendation": "Option B: Distributed Microservices",
+  "confidence": 0.84,
+  "rationale": "Primary recommendation 'Option B' selected based on highest weighted multi-criteria score (84.0% confidence).",
+  "alternatives": [
+    {
+      "id": "opt2",
+      "name": "Option B: Distributed Microservices",
+      "weighted_score": 0.88,
+      "pros": ["High scalability", "Fault isolation"],
+      "cons": ["Operational overhead"]
+    }
+  ],
+  "criteria": [
+    {"id": "c1", "name": "Cost Efficiency", "weight": 0.4},
+    {"id": "c2", "name": "System Scalability", "weight": 0.6}
+  ],
+  "weighted_matrix": {
+    "opt2": {"c1": 0.28, "c2": 0.60}
+  },
+  "scenarios": {
+    "top_scenario_pick": "Option B: Distributed Microservices",
+    "expected_payoffs": {"Option B: Distributed Microservices": 0.88}
+  },
+  "sensitivity_analysis": {
+    "baseline_recommendation": "Option B: Distributed Microservices",
+    "switch_points": [
+      {
+        "criterion_id": "c1",
+        "criterion_name": "Cost Efficiency",
+        "original_weight": 0.4,
+        "threshold_weight": 0.68,
+        "switches_from": "Option B: Distributed Microservices",
+        "switches_to": "Option A: Monolithic Deployment"
+      }
+    ]
+  },
+  "expected_values": {
+    "expected_values": {"Option B": 0.88},
+    "best_ev_alternative": "Option B"
+  },
+  "key_risks": ["Operational overhead", "Network partition risk"],
+  "assumptions": ["Traffic growth exceeds 50% year-over-year"],
+  "decision_triggers": [
+    {
+      "condition": "Cost overrun > 20%",
+      "threshold": "> 20%",
+      "action": "Re-run sensitivity matrix",
+      "severity": "high"
+    }
+  ],
+  "created_at": "2026-09-04T01:15:00Z",
+  "updated_at": "2026-09-04T01:15:00Z"
+}
+```

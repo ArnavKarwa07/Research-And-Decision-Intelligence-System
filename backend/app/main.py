@@ -33,11 +33,9 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     
-    try:
-        from app.api.v1.router import api_v1_router
-        app.include_router(api_v1_router)
-    except ImportError:
-        pass
+    from app.api.v1.router import api_v1_router
+    app.include_router(api_v1_router)
+
         
     @app.get("/health")
     async def health_check() -> dict[str, str]:

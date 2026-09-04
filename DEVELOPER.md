@@ -281,14 +281,43 @@ The LangGraph orchestration engine (`app/agents/graph.py`) incorporates a dynami
    - Loop iterations are strictly bounded by `max_replan_iterations`.
    - If iteration limit is reached while severity remains elevated, the system finalizes synthesis marked with `finalized_with_caveats = True` and explicit risk warnings.
 
+## Phase 6 Decision Intelligence Architecture
+
+Phase 6 introduces quantified decision support, multi-criteria decision analysis (MCDA), best/base/worst scenario modeling, weight sensitivity stress-testing, expected value calculations, and decision tripwire triggers.
+
+### 1. Decision Intelligence Engine & Tools
+
+Key modules in `app/tools/decision_tools.py` perform pure-Python, deterministic decision calculations:
+1. **`compare_options`**: Multi-attribute utility matrix engine. Normalizes criteria weights ($\sum w_j = 1.0$), validates raw scores in $[0.0, 1.0]$, computes weighted total $S_i = \sum w_j \times s_{ij}$, and ranks alternatives.
+2. **`run_scenario`**: Evaluates options across Best-case (25%), Base-case (50%), and Worst-case (25%) scenarios with probability distribution normalization.
+3. **`run_sensitivity`**: Sweeps criterion weights from 0.0 to 1.0 in `step_size` increments while re-normalizing other criteria proportionally. Identifies exact crossover/switch points where top recommendation flips.
+4. **`calculate_expected_value`**: Computes probabilistic expected payoff $EV_i = \sum p_k \times v_{ik}$ across scenarios.
+
+### 2. Decision Agent & Service Architecture
+
+1. **`DecisionAgent` (`app/agents/decision.py`)**: Specialist agent extending `BaseAgent`. Executes multi-criteria scoring, scenario simulation, sensitivity stress-testing, expected value calculation, and decision trigger identification.
+2. **`DecisionService` (`app/services/decision_service.py`)**: Manages decision CRUD operations, orchestrates agent execution, persists structured decision records to the database, and executes custom sensitivity/scenario re-runs.
+
+### 3. Database Table (`decisions`)
+
+The `decisions` table (`app/models/decision.py`) tracks:
+- `recommendation` & `confidence`
+- `alternatives` & `criteria` JSON lists
+- `weighted_matrix` JSON
+- `scenarios` & `sensitivity_analysis` JSON
+- `expected_values` & `decision_triggers` JSON
+- Foreign key `query_id` referencing `queries.id` with `ON DELETE CASCADE`.
+
 ## Testing & Audit Commands
 
 **Backend:**
 - Module imports check: `python -c "import app.models; import app.schemas; import app.agents; import app.tools; import app.services; import app.api.v1.router"`
+- Pytest Unit & Contract Tests: `python -m pytest tests/`
 - Ruff Linter: `ruff check app`
 - Type checking: `mypy app`
 
 **Frontend:**
 - Vite Production Build: `npm run build`
 - React Doctor Quality Audit: `npx react-doctor .` (Audited: **100/100 Great score**)
+
 

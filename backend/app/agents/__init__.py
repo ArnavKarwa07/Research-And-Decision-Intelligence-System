@@ -11,6 +11,7 @@ from app.agents.adversarial import AdversarialAgent
 from app.agents.hypothesis import HypothesisAgent
 from app.agents.falsification import FalsificationAgent
 from app.agents.critic import CriticAgent
+from app.agents.decision import DecisionAgent
 
 __all__ = [
     "BaseAgent",
@@ -28,4 +29,6 @@ __all__ = [
     "HypothesisAgent",
     "FalsificationAgent",
     "CriticAgent",
+    "DecisionAgent",
 ]
+
