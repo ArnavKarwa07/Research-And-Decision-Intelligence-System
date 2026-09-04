@@ -58,5 +58,118 @@ export const api = {
     const params = sourceType ? `?source_type=${sourceType}` : '';
     return fetchApi(`/queries/${queryId}/sources${params}`);
   },
+
+  // Phase 12 Continuous Intelligence Monitoring Endpoints (/api/v1/monitoring/*)
+  listMonitoringJobs: (params = {}) => {
+    const search = new URLSearchParams();
+    if (params.project_id) search.append('project_id', params.project_id);
+    if (params.session_id) search.append('session_id', params.session_id);
+    if (params.status) search.append('status', params.status);
+    const q = search.toString() ? `?${search.toString()}` : '';
+    return fetchApi(`/monitoring/jobs${q}`);
+  },
+
+  getMonitoringJob: (id) => fetchApi(`/monitoring/jobs/${id}`),
+
+  createMonitoringJob: (data) =>
+    fetchApi('/monitoring/jobs', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateMonitoringJob: (id, data) =>
+    fetchApi(`/monitoring/jobs/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  deleteMonitoringJob: (id) =>
+    fetchApi(`/monitoring/jobs/${id}`, {
+      method: 'DELETE',
+    }),
+
+  triggerMonitoringJobRun: (id, payload = {}) =>
+    fetchApi(`/monitoring/jobs/${id}/run`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  getMonitoringJobLogs: (id) => fetchApi(`/monitoring/jobs/${id}/logs`),
+
+  createBaselineSnapshot: (data) =>
+    fetchApi('/monitoring/baselines', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  getBaselineSnapshot: (id) => fetchApi(`/monitoring/baselines/${id}`),
+
+  listDecisionAlerts: (params = {}) => {
+    const search = new URLSearchParams();
+    if (params.job_id) search.append('job_id', params.job_id);
+    if (params.project_id) search.append('project_id', params.project_id);
+    if (params.session_id) search.append('session_id', params.session_id);
+    if (params.status) search.append('status', params.status);
+    if (params.severity) search.append('severity', params.severity);
+    const q = search.toString() ? `?${search.toString()}` : '';
+    return fetchApi(`/monitoring/alerts${q}`);
+  },
+
+  acknowledgeDecisionAlert: (id) =>
+    fetchApi(`/monitoring/alerts/${id}/acknowledge`, {
+      method: 'POST',
+    }),
+
+  // Phase 12 Project Memory & Research Heuristics Endpoints (/api/v1/memory/*)
+  listMemoryItems: (params = {}) => {
+    const search = new URLSearchParams();
+    if (params.project_id) search.append('project_id', params.project_id);
+    if (params.session_id) search.append('session_id', params.session_id);
+    if (params.memory_type) search.append('memory_type', params.memory_type);
+    if (params.validity_status) search.append('validity_status', params.validity_status);
+    if (params.human_approval_status) search.append('human_approval_status', params.human_approval_status);
+    if (params.key) search.append('key', params.key);
+    const q = search.toString() ? `?${search.toString()}` : '';
+    return fetchApi(`/memory/items${q}`);
+  },
+
+  getMemoryItem: (id) => fetchApi(`/memory/items/${id}`),
+
+  createMemoryItem: (data) =>
+    fetchApi('/memory/items', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateMemoryItem: (id, data) =>
+    fetchApi(`/memory/items/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  approveMemoryItem: (id, approval_status = 'APPROVED') =>
+    fetchApi(`/memory/items/${id}/approve`, {
+      method: 'POST',
+      body: JSON.stringify({ approval_status }),
+    }),
+
+  getResearchHeuristics: (domain, project_id = null) => {
+    const search = new URLSearchParams({ domain });
+    if (project_id) search.append('project_id', project_id);
+    return fetchApi(`/memory/heuristics?${search.toString()}`);
+  },
+
+  createOrUpdateHeuristics: (data) =>
+    fetchApi('/memory/heuristics', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  previewContextInjection: (data) =>
+    fetchApi('/memory/inject-context', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 };
+
 

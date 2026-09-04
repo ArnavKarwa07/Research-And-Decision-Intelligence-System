@@ -3,7 +3,7 @@ Defines explicit typed input, output, and state schemas for all production agent
 """
 from enum import Enum
 from typing import List, Dict, Any, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class ClaimType(str, Enum):
@@ -330,5 +330,101 @@ class EvaluationAgentOutput(BaseModel):
     total_latency_ms: float
     summary_message: str
     eval_results: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+# --- Monitoring Agent Contract (Phase 12 Continuous Intelligence) ---
+class MonitoringAgentInput(BaseModel):
+    """Input payload for MonitoringAgent executing decision monitoring check."""
+
+    job_id: str = Field(..., description="Target MonitoringJob UUID")
+    query_id: Optional[str] = Field(None, description="Original or new Query UUID")
+    baseline_snapshot_id: Optional[str] = Field(None, description="Baseline snapshot UUID for comparison")
+    alert_threshold: float = Field(default=0.5, ge=0.0, le=1.0, description="Materiality threshold triggering alert")
+    allowed_tools: List[str] = Field(
+        default_factory=lambda: ["search_web", "query_database", "compute_delta"],
+        description="Allowed tool identifiers"
+    )
+    token_budget: int = Field(default=20000, description="Token budget allocated for run")
+    timeout_seconds: int = Field(default=120, description="Execution timeout in seconds")
+    retry_limit: int = Field(default=2, description="Max retries allowed on transient failure")
+
+
+class MonitoringAgentOutput(BaseModel):
+    """Output contract for MonitoringAgent execution."""
+
+    job_id: str
+    execution_log_id: str
+    status: str = Field(..., description="SUCCESS, NO_CHANGE, FAILED, ALERT_TRIGGERED")
+    materiality_score: float = Field(default=0.0, ge=0.0, le=1.0)
+    materiality_level: str = Field(default="NEGLIGIBLE", description="NEGLIGIBLE, LOW, MEDIUM, HIGH, CRITICAL")
+    delta_summary: Dict[str, Any] = Field(default_factory=dict)
+    alert_triggered: bool = False
+    alert_id: Optional[str] = None
+    stop_reason: str = Field(default="OBJECTIVE_SATISFIED", description="Reason execution stopped")
+    summary_message: str = ""
+    error_message: Optional[str] = None
+
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, v: str) -> str:
+        valid_statuses = {"SUCCESS", "NO_CHANGE", "FAILED", "ALERT_TRIGGERED"}
+        upper_v = str(v).upper()
+        if upper_v not in valid_statuses:
+            raise ValueError(f"Invalid status '{v}'. Must be one of {valid_statuses}.")
+        return upper_v
+
+    @field_validator("materiality_level")
+    @classmethod
+    def validate_materiality_level(cls, v: str) -> str:
+        valid_levels = {"NEGLIGIBLE", "LOW", "MEDIUM", "HIGH", "CRITICAL"}
+        upper_v = str(v).upper()
+        if upper_v not in valid_levels:
+            raise ValueError(f"Invalid materiality_level '{v}'. Must be one of {valid_levels}.")
+        return upper_v
+
+
+# --- Memory Agent Contract (Phase 12 Project Memory & Heuristics) ---
+class MemoryAgentInput(BaseModel):
+    """Input payload for MemoryAgent long-term memory operations."""
+
+    action: str = Field(..., description="Action: RETRIEVE, STORE, UPDATE, INVALIDATE, HEURISTIC_LOOKUP")
+    project_id: Optional[str] = Field(None, description="Target Project UUID")
+    session_id: Optional[str] = Field(None, description="Target Session UUID")
+    query: Optional[str] = Field(None, description="Search query for retrieving memory items")
+    memory_type: Optional[str] = Field(None, description="DECISION_TRAIL, FACT, REUSABLE_ASSUMPTION, PRIOR_CONCLUSION, LESSON_LEARNED")
+    memory_item: Optional[Dict[str, Any]] = Field(None, description="Item payload for STORE/UPDATE actions")
+    memory_id: Optional[str] = Field(None, description="Target memory item UUID")
+    domain: Optional[str] = Field(None, description="Domain identifier for heuristics")
+    allowed_tools: List[str] = Field(
+        default_factory=lambda: ["search_memory", "store_memory", "update_memory", "get_heuristics"],
+        description="Allowed tool identifiers"
+    )
+    token_budget: int = Field(default=10000, description="Token budget allocated for run")
+    timeout_seconds: int = Field(default=60, description="Execution timeout in seconds")
+    retry_limit: int = Field(default=2, description="Max retries allowed on transient failure")
+
+    @field_validator("action")
+    @classmethod
+    def validate_action(cls, v: str) -> str:
+        valid_actions = {"RETRIEVE", "STORE", "UPDATE", "INVALIDATE", "HEURISTIC_LOOKUP", "HARVEST"}
+        upper_v = str(v).upper()
+        if upper_v not in valid_actions:
+            raise ValueError(f"Invalid action '{v}'. Must be one of {valid_actions}.")
+        return upper_v
+
+
+class MemoryAgentOutput(BaseModel):
+    """Output contract for MemoryAgent operations."""
+
+    is_success: bool = True
+    action_performed: str = ""
+    context: Optional[Dict[str, Any]] = Field(None, description="Serialized ProjectMemoryContext dictionary")
+    items: List[Dict[str, Any]] = Field(default_factory=list, description="Retrieved or affected ProjectMemoryItems")
+    heuristic: Optional[Dict[str, Any]] = Field(None, description="Retrieved ResearchHeuristic dictionary")
+    stop_reason: str = Field(default="OBJECTIVE_SATISFIED", description="Reason execution stopped")
+    message: str = ""
+    error_message: Optional[str] = None
+
+
 
 

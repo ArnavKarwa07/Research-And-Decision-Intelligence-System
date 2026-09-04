@@ -442,6 +442,151 @@ flowchart TD
     - `telemetry:budget_exceeded`: Hard budget limit error.
   - Global singleton instance: `cost_telemetry_tracker`.
 
+## Phase 12 Continuous Intelligence & Project Memory Architecture
+
+Phase 12 equips RADIS with autonomous continuous research monitoring, baseline delta comparison, quantitative materiality scoring, persistent project memory, domain research heuristics, and context injection into multi-agent prompt loops.
+
+### 1. Architecture Overview
+
+```mermaid
+flowchart TD
+    A["Research / Decision Execution State"] --> B["BaselineDeltaService"]
+    B --> C["ResearchBaselineSnapshot"]
+    
+    D["MonitoringSchedulerService"] -->|Poll / Schedule| E["MonitoringJob (CRON / INTERVAL)"]
+    E --> F["MonitoringAgent"]
+    
+    F -->|Fetch Baseline & Current State| B
+    B -->|Compute State Diffs| G["MaterialityScoringEngine"]
+    G -->|M = 0.35*S_assump + 0.25*S_contra + 0.25*S_matrix + 0.15*S_src| H["MaterialityScoreBreakdown"]
+    
+    H -->|M >= alert_threshold| I["DecisionAlertingService"]
+    I --> J["DecisionAlert (UNREAD)"]
+    I -->|Dispatch| K["Webhook URL"]
+    
+    A -->|Finished Run State| L["MemoryAgent"]
+    L -->|Harvest Facts & Assumptions| M["ProjectMemoryService"]
+    M --> N["ProjectMemoryItem (human_approval_status=PENDING)"]
+    L -->|Save Untrusted Domains & Patterns| O["HeuristicsStoreService"]
+    O --> P["ResearchHeuristics"]
+    
+    Q["Human Operator"] -->|Approve Assumption| M
+    M -->|human_approval_status=APPROVED| N
+    
+    N --> R["MemoryContextInjector"]
+    P --> R
+    R -->|format_context_for_prompt| S["Agent Prompt Context Block"]
+```
+
+Key Phase 12 modules in [`backend/app`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app):
+- **Continuous Monitoring Models & Services (`app/models/monitoring.py`, `app/services/monitoring_scheduler_service.py`)**: Manage scheduled jobs, 5-field cron parsing, interval runs, and log persistence.
+- **Baseline Delta Engine (`app/services/baseline_delta_service.py`)**: Snapshot creation (`create_baseline_snapshot`, `create_snapshot_from_query`) and state diffing.
+- **Materiality Scoring Engine (`app/services/materiality_scoring_engine.py`)**: Quantitative composite materiality formula.
+- **Decision Alerting Service (`app/services/decision_alerting_service.py`)**: Alert lifecycle management (`UNREAD`, `ACKNOWLEDGED`, `RESOLVED`) and webhook notification dispatch.
+- **Project Memory Engine (`app/models/project_memory.py`, `app/services/project_memory_service.py`)**: Cross-session persistent storage for facts, decision trails, reusable assumptions, prior conclusions, and lessons learned.
+- **Domain Heuristics Store (`app/services/heuristics_store_service.py`)**: Learning heuristics tracking untrusted domain blacklists, effective query templates, verified tool execution patterns, and failure modes.
+- **Memory Context Injector (`app/services/memory_context_injector.py`)**: Aggregates active, approved project memory items and domain heuristics, building a structured context block injected into agent prompts.
+- **Specialized Phase 12 Subagents (`app/agents/monitoring_agent.py`, `app/agents/memory_agent.py`)**: Specialist subagents inheriting from `BaseAgent` implementing typed input/output AGENTS.md contracts (`agent_contracts.py`).
+
+---
+
+### 2. Continuous Monitoring Job Scheduling (`MonitoringSchedulerService`)
+
+The [`MonitoringSchedulerService`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/services/monitoring_scheduler_service.py) handles continuous job scheduling, cron parsing, interval calculation, manual triggers, and execution log management:
+
+1. **Schedule Types**:
+   - **`CRON`**: Parsed via `calculate_next_cron_time` for standard 5-field cron syntax (`minute hour day-of-month month day-of-week`). Supports wildcards (`*`), steps (`*/N`), ranges (`A-B`), lists (`A,B`), and standard cron shorthands (`@daily`, `@hourly`).
+   - **`INTERVAL`**: Frequency specified in seconds (`interval_seconds >= 10`). `calculate_next_run_at` computes `next_run_at = now + timedelta(seconds=interval_seconds)`.
+   - **`EVENT_DRIVEN`**: Triggered externally on specific event notifications.
+2. **Job Lifecycle**:
+   - `create_job(job_in)`: Validates schedule syntax and persists `MonitoringJob` with initial `next_run_at`.
+   - `trigger_job_now(job_id, current_state)`: Executes an immediate manual run via `execute_job`, updating `last_run_at`, incrementing `run_count`, logging execution in `MonitoringExecutionLog`, and calculating `next_run_at`.
+   - `update_job(job_id, job_in)`: Supports pausing (`status = PAUSED`), resuming (`status = ACTIVE`), or updating schedule/threshold configurations.
+
+---
+
+### 3. Baseline Delta Engine (`BaselineDeltaService`)
+
+The [`BaselineDeltaService`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/services/baseline_delta_service.py) constructs state snapshots and computes state deltas between baselines and new research runs:
+
+1. **Snapshot Creation**:
+   - `create_baseline_snapshot(snapshot_in)`: Persists structured snapshots (`claims_snapshot`, `sources_snapshot`, `assumptions_snapshot`, `decision_snapshot`).
+   - `create_snapshot_from_query(query_id, snapshot_label)`: Automatically compiles a baseline snapshot by querying existing `Query`, `Claim`, `Source`, and `Decision` records associated with `query_id`.
+2. **Delta Calculation (`compute_delta`)**:
+   - **$S_{\text{assumption}}$**: Ratio of baseline assumptions present in `invalidated_assumptions` or marked as `INVALIDATED` / `REJECTED` in current state.
+   - **$S_{\text{contradiction}}$**: Weighted ratio of claim contradictions ($0.4 \times C_{\text{contra}}$) and new claims ($0.1 \times C_{\text{new}}$) relative to total baseline claims.
+   - **$S_{\text{matrix}}$**: Evaluates decision matrix drift. Automatically yields $S_{\text{matrix}} = 1.0$ if the primary recommendation flips (`recommendation_flipped = True`), or measures confidence score drift ($2.0 \times |\Delta \text{confidence}|$).
+   - **$S_{\text{source}}$**: Ratio of low-quality sources ($\text{quality\_score} < 0.4$) or untrusted domain matches ($0.3 \times N_{\text{untrusted}}$).
+
+---
+
+### 4. Mathematical Materiality Formula (`MaterialityScoringEngine`)
+
+The [`MaterialityScoringEngine`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/services/materiality_scoring_engine.py) calculates the composite materiality score $M \in [0.0, 1.0]$ using a weighted multi-factor linear equation:
+
+$$M = 0.35 \times S_{\text{assumption}} + 0.25 \times S_{\text{contradiction}} + 0.25 \times S_{\text{matrix}} + 0.15 \times S_{\text{source}}$$
+
+Where sub-scores are bounded in $[0.0, 1.0]$:
+- $S_{\text{assumption}} \in [0.0, 1.0]$: Assumption invalidation sub-score (Weight: $0.35$).
+- $S_{\text{contradiction}} \in [0.0, 1.0]$: Claim contradiction & addition sub-score (Weight: $0.25$).
+- $S_{\text{matrix}} \in [0.0, 1.0]$: Decision option score drift & recommendation flip sub-score (Weight: $0.25$).
+- $S_{\text{source}} \in [0.0, 1.0]$: Source reliability & untrusted domain match sub-score (Weight: $0.15$).
+
+#### Materiality Level Classification Table
+
+| Materiality Level | Score Range | Description & Action |
+| :--- | :--- | :--- |
+| `NEGLIGIBLE` | $M < 0.20$ | Minor delta; routine execution logging without notification |
+| `LOW` | $0.20 \le M < 0.40$ | Minor claim or source updates; logged for informational review |
+| `MEDIUM` | $0.40 \le M < 0.60$ | Moderate delta; notification logged; alert triggered if threshold $\le M$ |
+| `HIGH` | $0.60 \le M < 0.80$ | Significant assumption invalidation or decision matrix drift; high priority alert |
+| `CRITICAL` | $M \ge 0.80$ | Recommendation flip or severe assumption rejection; critical priority decision alert dispatched to webhook |
+
+---
+
+### 5. Project Memory Context Injection (`MemoryContextInjector`)
+
+The [`MemoryContextInjector`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/services/memory_context_injector.py) injects active, approved project memory items and domain heuristics into agent prompt context blocks:
+
+1. **Strict Human-in-the-Loop Approval Rule**:
+   - Candidate assumptions harvested from research runs are stored with `human_approval_status = PENDING`.
+   - `MemoryContextInjector` **strictly filters** memory items, only injecting items with:
+     $$\text{human\_approval\_status} \in \{\text{'APPROVED'}, \text{'NOT\_REQUIRED'}\}$$
+   - Pending or rejected assumptions are excluded from context injection until explicitly approved via `POST /api/v1/memory/items/{id}/approve`.
+2. **Context Formatting (`format_context_for_prompt`)**:
+   Outputs a structured Markdown context block:
+   ```markdown
+   ### PERSISTENT PROJECT MEMORY CONTEXT ###
+
+   #### Active Project Facts:
+   - [fact_key_1] Fact summary description... (Confidence: 0.95)
+
+   #### Validated Reusable Assumptions:
+   - [assumption_key_1] Approved assumption summary... (Status: APPROVED)
+
+   #### Domain Research Heuristics (finance):
+   - Untrusted Source Domains: unreliable-blog.com, speculative-news.net
+   - Effective Query Templates: {company} SEC Form 10-K filing financial metrics
+   ```
+
+---
+
+### 6. Specialist Subagents (`MonitoringAgent` & `MemoryAgent`)
+
+Both subagents inherit from `BaseAgent`, enforce AGENTS.md Rule 9 tool auditing, and utilize typed contracts:
+
+1. **`MonitoringAgent` ([`app/agents/monitoring_agent.py`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/agents/monitoring_agent.py))**:
+   - **Allowed Tools**: `["search_web", "query_database", "compute_delta"]`
+   - **Input Contract**: `MonitoringAgentInput(job_id, current_state, alert_threshold)`
+   - **Output Contract**: `MonitoringAgentOutput(job_id, execution_log_id, status, materiality_score, materiality_level, delta_summary, alert_triggered, alert_id, stop_reason, summary_message)`
+   - Performs DB-backed or standalone delta calculations, calculates $M$, logs executions, and generates alerts when $M \ge \text{alert\_threshold}$.
+
+2. **`MemoryAgent` ([`app/agents/memory_agent.py`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/agents/memory_agent.py))**:
+   - **Allowed Tools**: `["search_memory", "store_memory", "update_memory", "get_heuristics"]`
+   - **Input Contract**: `MemoryAgentInput(action, project_id, session_id, memory_type, memory_item, domain, query, run_state)`
+   - **Output Contract**: `MemoryAgentOutput(is_success, action_performed, items, context, heuristic, stop_reason, message)`
+   - Actions: `HARVEST` (extracts durable facts with `human_approval_status = APPROVED` and candidate assumptions with `human_approval_status = PENDING`), `STORE`, `RETRIEVE`, `UPDATE`, `INVALIDATE`, `HEURISTIC_LOOKUP`.
+
 ## Testing & Audit Commands
 
 **Backend:**

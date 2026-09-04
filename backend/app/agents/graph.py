@@ -6,6 +6,7 @@ step-level state checkpointing, and execution control (pause/resume/cancel).
 """
 import logging
 import asyncio
+import threading
 from typing import TypedDict, List, Dict, Any, Optional, Callable
 from datetime import datetime
 
@@ -21,6 +22,8 @@ from app.agents.hypothesis import HypothesisAgent
 from app.agents.falsification import FalsificationAgent
 from app.agents.critic import CriticAgent
 from app.agents.decision import DecisionAgent
+from app.agents.monitoring_agent import MonitoringAgent
+from app.agents.memory_agent import MemoryAgent
 
 logger = logging.getLogger(__name__)
 web_search_tool = WebSearchTool(provider=settings.search_provider)
@@ -38,31 +41,87 @@ class JobPausedError(Exception):
 
 
 class ExecutionControl:
-    """Registry tracking execution status (running, paused, cancelled) for active run IDs."""
+    """Registry tracking execution status (running, paused, cancelled) for active run IDs.
+    Thread-safe and async-safe state mutation enforcement.
+    """
     _run_status: Dict[str, str] = {}
+    _lock = threading.Lock()
+    _async_locks: Dict[asyncio.AbstractEventLoop, asyncio.Lock] = {}
+
+    @classmethod
+    def _get_async_lock(cls) -> asyncio.Lock:
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+        if loop is None:
+            return asyncio.Lock()
+        with cls._lock:
+            if loop not in cls._async_locks:
+                cls._async_locks[loop] = asyncio.Lock()
+            return cls._async_locks[loop]
 
     @classmethod
     def request_pause(cls, run_id: str):
-        cls._run_status[run_id] = "paused"
+        with cls._lock:
+            cls._run_status[run_id] = "paused"
+
+    @classmethod
+    async def request_pause_async(cls, run_id: str):
+        async with cls._get_async_lock():
+            with cls._lock:
+                cls._run_status[run_id] = "paused"
 
     @classmethod
     def request_resume(cls, run_id: str):
-        cls._run_status[run_id] = "running"
+        with cls._lock:
+            cls._run_status[run_id] = "running"
+
+    @classmethod
+    async def request_resume_async(cls, run_id: str):
+        async with cls._get_async_lock():
+            with cls._lock:
+                cls._run_status[run_id] = "running"
 
     @classmethod
     def request_cancel(cls, run_id: str):
-        cls._run_status[run_id] = "cancelled"
+        with cls._lock:
+            cls._run_status[run_id] = "cancelled"
+
+    @classmethod
+    async def request_cancel_async(cls, run_id: str):
+        async with cls._get_async_lock():
+            with cls._lock:
+                cls._run_status[run_id] = "cancelled"
 
     @classmethod
     def get_status(cls, run_id: str) -> str:
-        return cls._run_status.get(run_id, "running")
+        with cls._lock:
+            return cls._run_status.get(run_id, "running")
+
+    @classmethod
+    async def get_status_async(cls, run_id: str) -> str:
+        async with cls._get_async_lock():
+            with cls._lock:
+                return cls._run_status.get(run_id, "running")
 
     @classmethod
     def clear(cls, run_id: Optional[str] = None):
-        if run_id:
-            cls._run_status.pop(run_id, None)
-        else:
-            cls._run_status.clear()
+        with cls._lock:
+            if run_id:
+                cls._run_status.pop(run_id, None)
+            else:
+                cls._run_status.clear()
+
+    @classmethod
+    async def clear_async(cls, run_id: Optional[str] = None):
+        async with cls._get_async_lock():
+            with cls._lock:
+                if run_id:
+                    cls._run_status.pop(run_id, None)
+                else:
+                    cls._run_status.clear()
+
 
 
 def check_execution_and_checkpoint(
@@ -139,6 +198,13 @@ class AgentState(TypedDict):
     pause_requested: Optional[bool]
     cancel_requested: Optional[bool]
     active_checkpoint_id: Optional[str]
+    project_id: Optional[str]
+    session_id: Optional[str]
+    domain: Optional[str]
+    memory_context: Optional[Dict[str, Any]]
+    harvested_memory_items: Optional[List[Dict[str, Any]]]
+    monitoring_job_id: Optional[str]
+    monitoring_output: Optional[Dict[str, Any]]
 
 
 def get_langchain_llm() -> Optional[Any]:
@@ -178,6 +244,21 @@ Output 2 distinct line-separated web search query strings."""
         except Exception as e:
             logger.warning(f"Supervisor ChatGoogleGenerativeAI call fallback: {e}")
 
+    memory_context = state.get("memory_context")
+    if memory_context is None and (state.get("project_id") or state.get("session_id") or state.get("domain")):
+        try:
+            mem_agent = MemoryAgent()
+            mem_res = await mem_agent.run({
+                "action": "RETRIEVE",
+                "project_id": state.get("project_id"),
+                "session_id": state.get("session_id"),
+                "domain": state.get("domain"),
+                "query": state["text"],
+            })
+            memory_context = mem_res.get("context")
+        except Exception as e:
+            logger.warning(f"Memory context injection failed in supervisor_node: {e}")
+
     plan = [
         {"id": "task-1", "title": "Web Source Intelligence Gathering", "assigned_agent": "Research Agent", "status": "completed"},
         {"id": "task-2", "title": "Internal Knowledge Base Retrieval", "assigned_agent": "Retrieval Agent", "status": "completed"},
@@ -186,6 +267,8 @@ Output 2 distinct line-separated web search query strings."""
         {"id": "task-5", "title": "Alternative Hypothesis Generation", "assigned_agent": "Hypothesis Agent", "status": "completed"},
         {"id": "task-6", "title": "Falsification Counter-Evidence Search", "assigned_agent": "Falsification Agent", "status": "completed"},
         {"id": "task-7", "title": "Red-Team Adversarial Critique", "assigned_agent": "Critic Agent", "status": "completed"},
+        {"id": "task-8", "title": "Persistent Project Memory Harvesting", "assigned_agent": "Memory Agent", "status": "completed"},
+        {"id": "task-9", "title": "Continuous Decision Delta Monitoring", "assigned_agent": "Monitoring Agent", "status": "completed"},
     ]
 
     step_msg = f"Task decomposed into {len(plan)} sub-tasks across specialist agents. Search queries: {', '.join(search_queries)}"
@@ -200,6 +283,7 @@ Output 2 distinct line-separated web search query strings."""
     res = {
         "plan": plan,
         "search_queries": search_queries,
+        "memory_context": memory_context,
         "replan_count": state.get("replan_count", 0),
         "max_replan_iterations": state.get("max_replan_iterations", 3),
         "steps": state["steps"] + [new_step],
@@ -676,9 +760,79 @@ async def visualization_node(state: AgentState) -> Dict[str, Any]:
         "visualization_spec": res_agent.model_dump(),
         "steps": state["steps"] + [new_step],
         "current_step": state["current_step"] + 1,
-        "is_complete": True
     }
     return check_execution_and_checkpoint("visualization", state, res)
+
+
+# --- Node 15: Memory Agent Node (Phase 12 Project Memory & Heuristics) ---
+async def memory_node(state: AgentState) -> Dict[str, Any]:
+    logger.info("[LangGraph Memory Agent] Harvesting durable facts and submitting reusable assumptions")
+    agent = MemoryAgent()
+    input_data = {
+        "action": "HARVEST",
+        "project_id": state.get("project_id"),
+        "session_id": state.get("session_id"),
+        "domain": state.get("domain", "general"),
+        "run_state": {
+            "claims": state.get("claims", []),
+            "decision_matrix": state.get("decision_matrix", {}),
+            "summary": state.get("summary", ""),
+            "text": state.get("text", ""),
+        }
+    }
+    res_agent = await agent.run(input_data)
+    harvested_items = res_agent.get("items", [])
+
+    step_msg = f"Memory Agent harvested {len(harvested_items)} items (facts APPROVED, assumptions PENDING)."
+    new_step = {
+        "id": f"step-{int(datetime.now().timestamp()*1000)}-mem",
+        "agent_type": "Memory Agent",
+        "message": step_msg,
+        "status": "completed",
+        "timestamp": datetime.now().isoformat()
+    }
+
+    res = {
+        "harvested_memory_items": harvested_items,
+        "steps": state["steps"] + [new_step],
+        "current_step": state["current_step"] + 1,
+    }
+    return check_execution_and_checkpoint("memory", state, res)
+
+
+# --- Node 16: Monitoring Agent Node (Phase 12 Continuous Intelligence) ---
+async def monitoring_node(state: AgentState) -> Dict[str, Any]:
+    logger.info("[LangGraph Monitoring Agent] Evaluating decision monitoring delta & materiality impact")
+    agent = MonitoringAgent()
+    job_id = state.get("monitoring_job_id") or f"job-{int(datetime.now().timestamp())}"
+    input_data = {
+        "job_id": job_id,
+        "query_id": state.get("query_id"),
+        "alert_threshold": 0.5,
+        "current_state": {
+            "decision": state.get("decision_matrix", {}),
+            "claims": state.get("claims", []),
+            "diffs": {"summary": f"Monitoring run for '{state['text']}'"},
+        }
+    }
+    res_agent = await agent.run(input_data)
+
+    step_msg = f"Monitoring Agent evaluation status: {res_agent.get('status', 'NO_CHANGE')} (Materiality: {res_agent.get('materiality_score', 0.0):.2f})."
+    new_step = {
+        "id": f"step-{int(datetime.now().timestamp()*1000)}-mon",
+        "agent_type": "Monitoring Agent",
+        "message": step_msg,
+        "status": "completed",
+        "timestamp": datetime.now().isoformat()
+    }
+
+    res = {
+        "monitoring_output": res_agent,
+        "steps": state["steps"] + [new_step],
+        "current_step": state["current_step"] + 1,
+        "is_complete": True
+    }
+    return check_execution_and_checkpoint("monitoring", state, res)
 
 
 def should_replan(state: AgentState) -> str:
@@ -711,6 +865,8 @@ def create_langgraph_workflow():
     builder.add_node("decision", decision_node)
     builder.add_node("data", data_node)
     builder.add_node("visualization", visualization_node)
+    builder.add_node("memory", memory_node)
+    builder.add_node("monitoring", monitoring_node)
 
     builder.add_edge(START, "supervisor")
     builder.add_edge("supervisor", "research")
@@ -729,7 +885,9 @@ def create_langgraph_workflow():
     builder.add_conditional_edges("critic", should_replan)
     builder.add_edge("decision", "data")
     builder.add_edge("data", "visualization")
-    builder.add_edge("visualization", END)
+    builder.add_edge("visualization", "memory")
+    builder.add_edge("memory", "monitoring")
+    builder.add_edge("monitoring", END)
 
     return builder.compile()
 

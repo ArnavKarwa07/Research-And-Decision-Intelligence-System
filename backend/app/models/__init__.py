@@ -24,6 +24,27 @@ from app.models.clarification import ClarificationQuestion, ClarificationStatus
 from app.models.audit_log import AuditLog
 from app.models.eval_benchmark import GoldenDataset, GoldenTestCase, EvalRun, EvalResult
 from app.models.artifact import Artifact
+from app.models.monitoring import (
+    MonitoringJob,
+    ResearchBaselineSnapshot,
+    MonitoringExecutionLog,
+    DecisionAlert,
+    ScheduleType,
+    MonitoringJobStatus,
+    ExecutionLogStatus,
+    MaterialityLevel,
+    AlertSeverity,
+    AlertStatus,
+    WebhookStatus,
+)
+from app.models.project_memory import (
+    ProjectMemoryItem,
+    ResearchHeuristics,
+    ResearchHeuristic,
+    MemoryType,
+    ValidityStatus,
+    HumanApprovalStatus,
+)
 
 __all__ = [
     "Base",
@@ -59,8 +80,21 @@ __all__ = [
     "EvalRun",
     "EvalResult",
     "Artifact",
+    "MonitoringJob",
+    "ResearchBaselineSnapshot",
+    "MonitoringExecutionLog",
+    "DecisionAlert",
+    "ScheduleType",
+    "MonitoringJobStatus",
+    "ExecutionLogStatus",
+    "MaterialityLevel",
+    "AlertSeverity",
+    "AlertStatus",
+    "WebhookStatus",
+    "ProjectMemoryItem",
+    "ResearchHeuristics",
+    "ResearchHeuristic",
+    "MemoryType",
+    "ValidityStatus",
+    "HumanApprovalStatus",
 ]
-
-
-
-

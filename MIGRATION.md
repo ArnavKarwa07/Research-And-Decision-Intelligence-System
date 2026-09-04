@@ -1,6 +1,126 @@
 # Migration Guide
 
-This document outlines database migration strategies and provides a roadmap for transitioning the Research And Decision Intelligence System (RADIS) from Phase 1 to Phase 9.
+This document outlines database migration strategies and provides a roadmap for transitioning the Research And Decision Intelligence System (RADIS) from Phase 1 to Phase 12.
+
+## Phase 12 Implemented Schema & Infrastructure Additions (Continuous Intelligence & Project Memory)
+
+Phase 12 introduces 6 new database tables for continuous research monitoring, baseline snapshots, job execution logs, decision alert notifications, persistent cross-session project memory, and domain-specific research heuristics.
+
+### 1. New Database Table Definitions
+
+1. **`research_baseline_snapshots` Table (`ResearchBaselineSnapshot` model in [`app/models/monitoring.py`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/models/monitoring.py)):**
+   - Stores baseline state snapshots of claims, sources, assumptions, and decision matrices for delta comparison over time.
+   - Columns:
+     - `id`: `UUID` (Primary Key, default `uuid4`)
+     - `project_id`: `UUID` (Indexed, nullable)
+     - `session_id`: `UUID` (Foreign Key `sessions.id`, ondelete `SET NULL`, indexed, nullable)
+     - `query_id`: `UUID` (Foreign Key `queries.id`, ondelete `SET NULL`, indexed, nullable)
+     - `decision_id`: `UUID` (Foreign Key `decisions.id`, ondelete `SET NULL`, indexed, nullable)
+     - `snapshot_label`: `String` (Non-null, version/label string)
+     - `claims_snapshot`: `JSON` (List of serialized claim dictionaries)
+     - `sources_snapshot`: `JSON` (List of serialized source dictionaries)
+     - `assumptions_snapshot`: `JSON` (List of serialized assumption dictionaries)
+     - `decision_snapshot`: `JSON` (Dict containing decision matrix, recommendation, and confidence)
+     - `created_at` / `updated_at`: `DateTime(timezone=True)` (UTC timestamps)
+
+2. **`monitoring_jobs` Table (`MonitoringJob` model in [`app/models/monitoring.py`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/models/monitoring.py)):**
+   - Defines scheduled continuous research monitoring tasks and schedule rules.
+   - Columns:
+     - `id`: `UUID` (Primary Key, default `uuid4`)
+     - `project_id`: `UUID` (Indexed, nullable)
+     - `session_id`: `UUID` (Foreign Key `sessions.id`, ondelete `SET NULL`, indexed, nullable)
+     - `query_id`: `UUID` (Foreign Key `queries.id`, ondelete `SET NULL`, indexed, nullable)
+     - `baseline_snapshot_id`: `UUID` (Foreign Key `research_baseline_snapshots.id`, ondelete `SET NULL`, indexed, nullable)
+     - `name`: `String` (Non-null, job name)
+     - `schedule_type`: `String(30)` (Non-null, default `INTERVAL`; enum: `CRON`, `INTERVAL`, `EVENT_DRIVEN`)
+     - `cron_expression`: `String(100)` (Nullable; 5-field cron string for `CRON` schedule)
+     - `interval_seconds`: `Integer` (Nullable; interval duration in seconds for `INTERVAL` schedule, minimum 10s)
+     - `status`: `String(30)` (Indexed, default `ACTIVE`; enum: `ACTIVE`, `PAUSED`, `COMPLETED`, `FAILED`)
+     - `alert_threshold`: `Float` (Non-null, materiality threshold in [0.0, 1.0], default `0.5`)
+     - `webhook_url`: `Text` (Nullable; optional notification webhook URL)
+     - `last_run_at`: `DateTime(timezone=True)` (Nullable; UTC timestamp of last run)
+     - `next_run_at`: `DateTime(timezone=True)` (Nullable; UTC timestamp of next scheduled run)
+     - `run_count`: `Integer` (Non-null, execution counter, default `0`)
+     - `metadata`: Column alias `metadata_`, `JSON` (Configuration dict)
+     - `created_at` / `updated_at`: `DateTime(timezone=True)` (UTC timestamps)
+
+3. **`monitoring_execution_logs` Table (`MonitoringExecutionLog` model in [`app/models/monitoring.py`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/models/monitoring.py)):**
+   - Logs individual job evaluation runs, computed materiality scores, sub-scores, and alert triggers.
+   - Columns:
+     - `id`: `UUID` (Primary Key, default `uuid4`)
+     - `job_id`: `UUID` (Foreign Key `monitoring_jobs.id`, ondelete `CASCADE`, non-null, indexed)
+     - `new_query_id`: `UUID` (Foreign Key `queries.id`, ondelete `SET NULL`, indexed, nullable)
+     - `status`: `String(30)` (Non-null, default `SUCCESS`; enum: `SUCCESS`, `NO_CHANGE`, `FAILED`, `ALERT_TRIGGERED`)
+     - `materiality_score`: `Float` (Non-null, composite score M in [0.0, 1.0], default `0.0`)
+     - `materiality_level`: `String(30)` (Non-null, default `NEGLIGIBLE`; enum: `NEGLIGIBLE`, `LOW`, `MEDIUM`, `HIGH`, `CRITICAL`)
+     - `delta_summary`: `JSON` (Detailed factor breakdown, sub-scores, diffs, recommendation flip status)
+     - `alert_triggered`: `Boolean` (Non-null, default `False`)
+     - `executed_at`: `DateTime(timezone=True)` (Non-null, server default `func.now()`)
+     - `execution_duration_seconds`: `Float` (Non-null, duration in seconds, default `0.0`)
+     - `error_message`: `Text` (Nullable; error description if failed)
+
+4. **`decision_alerts` Table (`DecisionAlert` model in [`app/models/monitoring.py`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/models/monitoring.py)):**
+   - Stores decision alerts dispatched when a monitoring job run exceeds its materiality threshold.
+   - Columns:
+     - `id`: `UUID` (Primary Key, default `uuid4`)
+     - `job_id`: `UUID` (Foreign Key `monitoring_jobs.id`, ondelete `CASCADE`, non-null, indexed)
+     - `execution_log_id`: `UUID` (Foreign Key `monitoring_execution_logs.id`, ondelete `SET NULL`, indexed, nullable)
+     - `project_id`: `UUID` (Indexed, nullable)
+     - `session_id`: `UUID` (Foreign Key `sessions.id`, ondelete `SET NULL`, indexed, nullable)
+     - `materiality_score`: `Float` (Non-null, score triggering the alert)
+     - `severity`: `String(30)` (Non-null, default `INFO`; enum: `INFO`, `WARNING`, `HIGH`, `CRITICAL`)
+     - `title`: `String` (Non-null, alert title)
+     - `message`: `Text` (Non-null, alert body text)
+     - `payload`: `JSON` (Full alert context, delta breakdown, and recommendation drift details)
+     - `status`: `String(30)` (Indexed, default `UNREAD`; enum: `UNREAD`, `ACKNOWLEDGED`, `RESOLVED`)
+     - `webhook_status`: `String(30)` (Non-null, default `NONE`; enum: `NONE`, `DELIVERED`, `FAILED`)
+     - `created_at` / `updated_at`: `DateTime(timezone=True)` (UTC timestamps)
+
+5. **`project_memory_items` Table (`ProjectMemoryItem` model in [`app/models/project_memory.py`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/models/project_memory.py)):**
+   - Persists durable facts, decision trails, reusable assumptions, prior conclusions, and lessons learned.
+   - Columns:
+     - `id`: `UUID` (Primary Key, default `uuid4`)
+     - `project_id`: `UUID` (Indexed, nullable)
+     - `session_id`: `UUID` (Foreign Key `sessions.id`, ondelete `SET NULL`, indexed, nullable)
+     - `memory_type`: `String(50)` (Indexed, non-null; enum: `DECISION_TRAIL`, `FACT`, `REUSABLE_ASSUMPTION`, `PRIOR_CONCLUSION`, `LESSON_LEARNED`)
+     - `key`: `String(255)` (Indexed, non-null; concept key or lookup topic)
+     - `summary`: `Text` (Non-null, high-level memory summary)
+     - `content`: `JSON` (Structured memory details)
+     - `confidence`: `Float` (Non-null, confidence in [0.0, 1.0], default `1.0`)
+     - `source_query_id`: `UUID` (Foreign Key `queries.id`, ondelete `SET NULL`, indexed, nullable)
+     - `validity_status`: `String(30)` (Indexed, default `ACTIVE`; enum: `ACTIVE`, `SUPERSEDED`, `INVALIDATED`)
+     - `human_approval_status`: `String(30)` (Indexed, default `NOT_REQUIRED`; enum: `NOT_REQUIRED`, `PENDING`, `APPROVED`, `REJECTED`)
+     - `tags`: `JSON` (List of string categorization tags)
+     - `created_at` / `updated_at`: `DateTime(timezone=True)` (UTC timestamps)
+
+6. **`research_heuristics` Table (`ResearchHeuristics` model in [`app/models/project_memory.py`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/models/project_memory.py)):**
+   - Stores domain-specific research learning heuristics, untrusted domain blacklists, and successful query templates.
+   - Columns:
+     - `id`: `UUID` (Primary Key, default `uuid4`)
+     - `project_id`: `UUID` (Indexed, nullable)
+     - `session_id`: `UUID` (Foreign Key `sessions.id`, ondelete `SET NULL`, indexed, nullable)
+     - `domain`: `String(255)` (Indexed, non-null; e.g. `"finance"`, `"cloud_computing"`)
+     - `untrusted_domains`: `JSON` (List of untrusted or unreliable domain strings)
+     - `effective_query_templates`: `JSON` (List of high-performing query template strings)
+     - `verified_tool_patterns`: `JSON` (List of verified tool call sequence dicts)
+     - `failure_modes`: `JSON` (List of recorded failure mode dicts)
+     - `created_at` / `updated_at`: `DateTime(timezone=True)` (UTC timestamps)
+
+### 2. Migration Execution
+
+To apply Phase 12 schema migrations to SQLite or PostgreSQL database instances:
+
+```bash
+cd backend
+alembic revision --autogenerate -m "Add Phase 12 tables: research_baseline_snapshots, monitoring_jobs, monitoring_execution_logs, decision_alerts, project_memory_items, research_heuristics"
+alembic upgrade head
+```
+
+### 3. Backward Compatibility & Isolation
+
+- **Non-Breaking Architecture**: All 6 Phase 12 database tables are decoupled standalone tables linked to existing `sessions` and `queries` tables via `ondelete="SET NULL"` or `ondelete="CASCADE"` foreign keys.
+- **Graceful Nullability**: Foreign keys `project_id`, `session_id`, `query_id`, and `baseline_snapshot_id` are optional, allowing standalone, session-scoped, or project-scoped operations.
+- **Zero-Downtime Migration**: Pre-Phase 12 queries, decisions, and documents execute without interruption or schema modification.
 
 ## Phase 9 Implemented Production Agent Runtime & Checkpointing Architecture
 

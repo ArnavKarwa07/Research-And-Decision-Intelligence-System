@@ -87,6 +87,24 @@ from .observability import (
     LatencyPercentiles,
     CostDashboardMetrics,
 )
+from .monitoring import (
+    MonitoringJobCreate,
+    MonitoringJobResponse,
+    MonitoringJobUpdate,
+    BaselineSnapshotCreate,
+    BaselineSnapshotResponse,
+    MonitoringExecutionLogResponse,
+    DecisionAlertResponse,
+    MaterialityScoreBreakdown,
+)
+from .project_memory import (
+    ProjectMemoryItemCreate,
+    ProjectMemoryItemResponse,
+    ProjectMemoryItemUpdate,
+    ResearchHeuristicCreate,
+    ResearchHeuristicResponse,
+    ProjectMemoryContext,
+)
 
 __all__ = [
     "ErrorResponse",
@@ -185,7 +203,18 @@ __all__ = [
     "AgentTimelineResponse",
     "LatencyPercentiles",
     "CostDashboardMetrics",
+    "MonitoringJobCreate",
+    "MonitoringJobResponse",
+    "MonitoringJobUpdate",
+    "BaselineSnapshotCreate",
+    "BaselineSnapshotResponse",
+    "MonitoringExecutionLogResponse",
+    "DecisionAlertResponse",
+    "MaterialityScoreBreakdown",
+    "ProjectMemoryItemCreate",
+    "ProjectMemoryItemResponse",
+    "ProjectMemoryItemUpdate",
+    "ResearchHeuristicCreate",
+    "ResearchHeuristicResponse",
+    "ProjectMemoryContext",
 ]
-
-
-

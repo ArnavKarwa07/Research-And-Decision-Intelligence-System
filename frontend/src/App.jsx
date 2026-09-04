@@ -9,6 +9,8 @@ import AgentActivityTab from './components/AgentActivityTab';
 import SourcesRepositoryTab from './components/SourcesRepositoryTab';
 import ClaimsGraphTab from './components/ClaimsGraphTab';
 import ExportArtifactModal from './components/ExportArtifactModal';
+import MonitoringDashboard from './components/MonitoringDashboard';
+import ProjectMemoryWorkspace from './components/ProjectMemoryWorkspace';
 import { api } from './lib/api';
 import { connectToStream } from './lib/sse';
 
@@ -26,8 +28,9 @@ export default function App() {
   const [contradictions, setContradictions] = useState([]);
   const [graphData, setGraphData] = useState({ nodes: [], edges: [], stats: {} });
   
-  // 6 Dedicated Research Workspace Navigation Tabs
+  // Phase 12 Continuous Intelligence Navigation Workspace Tabs
   const [activeTab, setActiveTab] = useState('Plan');
+  const [unreadAlertsCount, setUnreadAlertsCount] = useState(2);
   const [errorMsg, setErrorMsg] = useState(null);
   const [showExportModal, setShowExportModal] = useState(false);
 
@@ -48,6 +51,10 @@ export default function App() {
   }, []);
 
   const handleNewSession = useCallback(async () => {
+    if (streamCleanupRef.current) {
+      streamCleanupRef.current();
+      streamCleanupRef.current = null;
+    }
     setErrorMsg(null);
     try {
       const newSession = await api.createSession({ title: 'New Research Workspace' });
@@ -74,6 +81,17 @@ export default function App() {
         setErrorMsg(`Unable to connect to backend server: ${e.message}`);
       });
 
+    // Fetch active decision alerts count
+    api.listDecisionAlerts()
+      .then(alerts => {
+        if (!isSubscribed || !alerts) return;
+        const unread = alerts.filter(a => a.status === 'UNREAD' || a.status === 'TRIGGERED').length;
+        setUnreadAlertsCount(unread);
+      })
+      .catch(() => {
+        // Keep initial fallback count if offline
+      });
+
     return () => {
       isSubscribed = false;
       if (streamCleanupRef.current) streamCleanupRef.current();
@@ -81,6 +99,10 @@ export default function App() {
   }, []);
 
   const handleSelectSession = (id) => {
+    if (streamCleanupRef.current) {
+      streamCleanupRef.current();
+      streamCleanupRef.current = null;
+    }
     setActiveSessionId(id);
     resetWorkspace();
   };
@@ -97,6 +119,9 @@ export default function App() {
     setSteps([]);
     setEvidence([]);
     setErrorMsg(null);
+    if (activeTab === 'Monitoring' || activeTab === 'Project Memory') {
+      setActiveTab('Plan');
+    }
 
     const initialStep = {
       id: `step-${Date.now()}`,
@@ -205,6 +230,17 @@ export default function App() {
         </div>
 
         <div className="flex items-center gap-3">
+          {/* Decision Alerts Counter Badge Header Trigger */}
+          {unreadAlertsCount > 0 && (
+            <button
+              onClick={() => setActiveTab('Monitoring')}
+              className="flex items-center gap-1.5 bg-red-950/80 border border-red-500/80 px-3 py-1.5 rounded-lg text-xs font-mono text-red-300 font-bold hover:bg-red-900 transition-colors cursor-pointer shadow-md"
+            >
+              <span className="material-symbols-outlined text-red-400 text-sm animate-bounce">notifications_active</span>
+              <span>{unreadAlertsCount} Unread Alerts</span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={() => setShowExportModal(true)}
@@ -224,6 +260,9 @@ export default function App() {
           activeSessionId={activeSessionId}
           onNewSession={handleNewSession}
           onSelectSession={handleSelectSession}
+          activeTab={activeTab}
+          onSelectTab={setActiveTab}
+          unreadAlertsCount={unreadAlertsCount}
         />
 
         {/* Center Workspace Canvas */}
@@ -242,36 +281,56 @@ export default function App() {
               </div>
             )}
 
-            {steps.length === 0 && evidence.length === 0 && claims.length === 0 ? (
+            {/* View Tab Switcher Header Bar */}
+            <div className="flex flex-wrap gap-2 border-b border-outline-variant mb-6 pb-2 text-xs font-mono font-bold shrink-0" role="tablist" aria-label="Research Workspace Views">
+              {[
+                { id: 'Plan', label: '🗺️ Plan View' },
+                { id: 'Evidence', label: '🔍 Evidence View' },
+                { id: 'Decision', label: '⚖️ Decision View' },
+                { id: 'Agent Activity', label: '⏱️ Agent Activity' },
+                { id: 'Sources', label: '📂 Sources Repository' },
+                { id: 'Claims Graph', label: '🕸️ Claims Graph' },
+                { id: 'Monitoring', label: `🛰️ Monitoring ${unreadAlertsCount > 0 ? `(${unreadAlertsCount})` : ''}` },
+                { id: 'Project Memory', label: '🧠 Project Memory' },
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-cyber-cyan/50 ${
+                    activeTab === tab.id
+                      ? 'bg-cyber-cyan/20 text-cyber-cyan border border-cyber-cyan/50 shadow-md font-bold'
+                      : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-variant/40'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Standalone Workspace Tabs (Monitoring & Project Memory available anytime) */}
+            {activeTab === 'Monitoring' ? (
+              <div className="flex-1 overflow-y-auto pb-28">
+                <MonitoringDashboard
+                  activeSessionId={activeSessionId}
+                  activeQueryId={currentQuery?.id}
+                  onAlertCountChange={setUnreadAlertsCount}
+                />
+              </div>
+            ) : activeTab === 'Project Memory' ? (
+              <div className="flex-1 overflow-y-auto pb-28">
+                <ProjectMemoryWorkspace
+                  activeSessionId={activeSessionId}
+                  activeQueryId={currentQuery?.id}
+                />
+              </div>
+            ) : steps.length === 0 && evidence.length === 0 && claims.length === 0 ? (
               <EmptyHeroState onSubmitQuery={handleSubmitQuery} />
             ) : (
-              /* Enterprise Research Workspace Engine */
+              /* Enterprise Research Workspace Engine Views */
               <div className="flex-1 flex flex-col w-full h-full">
-                
-                {/* 6 Dedicated View Navigation Tabs Bar */}
-                <div className="flex gap-2 border-b border-outline-variant mb-6 pb-2 text-xs font-mono font-bold">
-                  {[
-                    { id: 'Plan', label: '🗺️ Plan View' },
-                    { id: 'Evidence', label: '🔍 Evidence View' },
-                    { id: 'Decision', label: '⚖️ Decision View' },
-                    { id: 'Agent Activity', label: '⏱️ Agent Activity' },
-                    { id: 'Sources', label: '📂 Sources Repository' },
-                    { id: 'Claims Graph', label: '🕸️ Claims Graph' },
-                  ].map(tab => (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveTab(tab.id)}
-                      className={`px-3.5 py-2 rounded-xl transition-all ${
-                        activeTab === tab.id
-                          ? 'bg-primary/20 text-primary border border-primary/40 shadow-md'
-                          : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-variant/40'
-                      }`}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
-                </div>
-
                 {/* Tab View Container */}
                 <div className="flex-1 overflow-y-auto pb-28">
                   {activeTab === 'Plan' && (

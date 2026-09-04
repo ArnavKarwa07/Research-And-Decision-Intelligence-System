@@ -20,9 +20,9 @@ from app.api.v1 import (
     eval as eval_router,
     observability as observability_router,
     artifacts,
+    monitoring,
+    project_memory,
 )
-
-
 
 
 api_v1_router = APIRouter(prefix="/api/v1", tags=["v1"])
@@ -46,4 +46,6 @@ api_v1_router.include_router(runtime.router)
 api_v1_router.include_router(eval_router.router)
 api_v1_router.include_router(observability_router.router)
 api_v1_router.include_router(artifacts.router)
+api_v1_router.include_router(monitoring.router)
+api_v1_router.include_router(project_memory.router)
 

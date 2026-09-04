@@ -1,13 +1,13 @@
 """Source model."""
 import uuid
 from datetime import datetime
-from sqlalchemy import Text, Float, DateTime
+from sqlalchemy import Text, Float, DateTime, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import String
 from sqlalchemy.sql import func
 
 from app.models.base import Base, TimestampMixin
-from typing import TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from app.models.evidence import Evidence
@@ -21,6 +21,11 @@ class Source(TimestampMixin, Base):
     id: Mapped[uuid.UUID] = mapped_column(
         primary_key=True,
         default=uuid.uuid4
+    )
+    query_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("queries.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True
     )
     url: Mapped[str] = mapped_column(String, nullable=False)
     title: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -46,6 +51,11 @@ class Source(TimestampMixin, Base):
         back_populates="source"
     )
     
+    def __init__(self, **kwargs: Any) -> None:
+        if "id" not in kwargs or kwargs["id"] is None:
+            kwargs["id"] = uuid.uuid4()
+        super().__init__(**kwargs)
+
     claim_sources: Mapped[list["ClaimSource"]] = relationship(
         "ClaimSource",
         back_populates="source",

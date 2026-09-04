@@ -5,6 +5,49 @@ All notable changes to the Research And Decision Intelligence System (RADIS) wil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [12.0.0] - Phase 12 Release - 2026-09-05
+
+### Added (Phase 12 Continuous Intelligence & Decision Monitoring)
+- **Continuous Research Monitoring Engine (`MonitoringJob`, `ResearchBaselineSnapshot`, `MonitoringExecutionLog`, `DecisionAlert`)**: Automated continuous tracking of research topics, market conditions, and decision assumptions. Supports CRON (5-field cron parsing), INTERVAL (in seconds), and EVENT_DRIVEN schedules with alert thresholds and webhook URL notifications.
+- **Persistent Project Memory Engine (`ProjectMemoryItem`, `ResearchHeuristics`)**: Multi-session persistent project memory storing active facts, decision trails, prior conclusions, reusable assumptions, and lessons learned. Includes domain-specific research heuristics (untrusted domain blacklists, effective query templates, verified tool execution patterns, and failure modes).
+- **Mathematical Materiality Scoring Engine (`MaterialityScoringEngine`)**: Quantitative materiality calculation evaluating baseline state deltas across 4 weighted dimensions:
+  $$M = 0.35 \times S_{\text{assumption}} + 0.25 \times S_{\text{contradiction}} + 0.25 \times S_{\text{matrix}} + 0.15 \times S_{\text{source}}$$
+  Classifies delta impact into 5 materiality levels: `NEGLIGIBLE` ($M < 0.2$), `LOW` ($M < 0.4$), `MEDIUM` ($M < 0.6$), `HIGH` ($M < 0.8$), and `CRITICAL` ($M \ge 0.8$).
+- **Baseline Delta Engine (`BaselineDeltaService`)**: Automated baseline snapshot creation (`create_baseline_snapshot`, `create_snapshot_from_query`) and state diffing tracking assumption invalidations ($S_{\text{assumption}}$), claim additions and contradictions ($S_{\text{contradiction}}$), decision matrix recommendation flips and score drifts ($S_{\text{matrix}}$), and source quality degradation or untrusted domain matches ($S_{\text{source}}$).
+- **Project Memory Context Injector (`MemoryContextInjector`)**: Dynamically injects active facts, prior conclusions, validated reusable assumptions (enforcing Human-in-the-Loop `human_approval_status in ['APPROVED', 'NOT_REQUIRED']`), lessons learned, and domain heuristics into research and supervisor agent prompt context blocks (`format_context_for_prompt`).
+- **Specialized Phase 12 Subagents (`MonitoringAgent`, `MemoryAgent`)**:
+  - `MonitoringAgent`: Subagent executing monitoring job evaluations, calculating delta materiality, generating executive summaries, and triggering decision alerts.
+  - `MemoryAgent`: Subagent inspecting completed research runs, harvesting durable facts, submitting candidate reusable assumptions for human approval (`human_approval_status = PENDING`), and updating domain heuristics.
+- **Typed Agent Contracts & Pydantic Schemas (`agent_contracts.py`, `schemas/monitoring.py`, `schemas/project_memory.py`)**:
+  - `MonitoringAgentInput` / `MonitoringAgentOutput`
+  - `MemoryAgentInput` / `MemoryAgentOutput`
+  - `BaselineSnapshotCreate` / `BaselineSnapshotResponse`
+  - `MonitoringJobCreate` / `MonitoringJobUpdate` / `MonitoringJobResponse`
+  - `MonitoringExecutionLogResponse` / `DecisionAlertResponse`
+  - `ProjectMemoryItemCreate` / `ProjectMemoryItemUpdate` / `ProjectMemoryItemResponse`
+  - `ResearchHeuristicCreate` / `ResearchHeuristicResponse`
+  - `ProjectMemoryContext`
+- **Continuous Intelligence REST APIs**: 19 new endpoints under `/api/v1/monitoring/*` and `/api/v1/memory/*`:
+  - `POST /api/v1/monitoring/jobs`: Create continuous monitoring job.
+  - `GET /api/v1/monitoring/jobs`: List monitoring jobs filtered by project, session, or status.
+  - `GET /api/v1/monitoring/jobs/{id}`: Retrieve monitoring job details by ID.
+  - `PATCH /api/v1/monitoring/jobs/{id}`: Update, pause, resume, or reconfigure monitoring job.
+  - `DELETE /api/v1/monitoring/jobs/{id}`: Delete monitoring job.
+  - `POST /api/v1/monitoring/jobs/{id}/run`: Trigger immediate manual run for a monitoring job.
+  - `GET /api/v1/monitoring/jobs/{id}/logs`: Retrieve execution logs for a monitoring job.
+  - `POST /api/v1/monitoring/baselines`: Create research baseline snapshot.
+  - `GET /api/v1/monitoring/baselines/{id}`: Retrieve research baseline snapshot by ID.
+  - `GET /api/v1/monitoring/alerts`: List decision alerts by job, project, session, severity, or status.
+  - `POST /api/v1/monitoring/alerts/{id}/acknowledge`: Acknowledge decision alert.
+  - `POST /api/v1/memory/items`: Create persistent project memory item.
+  - `GET /api/v1/memory/items`: List memory items filtered by project, session, memory type, validity status, or approval status.
+  - `GET /api/v1/memory/items/{id}`: Retrieve project memory item by ID.
+  - `PATCH /api/v1/memory/items/{id}`: Update project memory item.
+  - `POST /api/v1/memory/items/{id}/approve`: Approve or reject memory item or assumption (`APPROVED` / `REJECTED`).
+  - `GET /api/v1/memory/heuristics`: Retrieve domain-specific research heuristics.
+  - `POST /api/v1/memory/heuristics`: Add or update domain-specific research heuristics.
+  - `POST /api/v1/memory/inject-context`: Preview project memory context injection for prompt generation.
+
 ## [11.0.0] - Phase 11 Release - 2026-09-04
 
 ### Added (Phase 11 Production UX & Artifact Export Package Engine)

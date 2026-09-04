@@ -10,6 +10,8 @@ logger = logging.getLogger(__name__)
 class SupervisorInput(BaseModel):
     query_text: str
     session_id: str
+    project_id: str | None = None
+    domain: str | None = None
     user_preferences: dict[str, Any] = Field(default_factory=dict)
     run_id: str | None = None
 
@@ -56,6 +58,9 @@ class SupervisorAgent(BaseAgent):
             'sub_agents': [],
             'query': '',
             'run_id': None,
+            'project_id': None,
+            'domain': None,
+            'memory_context': None,
             'budget_capped': False,
             'processed_indices': set(),
         }
@@ -88,10 +93,26 @@ class SupervisorAgent(BaseAgent):
                 typed_input = SupervisorInput(**input_data)
                 self.internal_state['query'] = typed_input.query_text
                 self.internal_state['user_preferences'] = typed_input.user_preferences
+                self.internal_state['project_id'] = typed_input.project_id or input_data.get('project_id')
+                self.internal_state['domain'] = typed_input.domain or input_data.get('domain')
                 if typed_input.run_id:
                     self.internal_state['run_id'] = typed_input.run_id
                 elif input_data.get('run_id'):
                     self.internal_state['run_id'] = str(input_data.get('run_id'))
+
+                try:
+                    from .memory_agent import MemoryAgent
+                    mem_agent = MemoryAgent()
+                    mem_res = await mem_agent.run({
+                        "action": "RETRIEVE",
+                        "project_id": self.internal_state.get('project_id'),
+                        "session_id": typed_input.session_id,
+                        "domain": self.internal_state.get('domain'),
+                        "query": typed_input.query_text,
+                    })
+                    self.internal_state['memory_context'] = mem_res.get("context")
+                except Exception as e:
+                    logger.warning(f"Supervisor memory context injection fallback: {e}")
                 
             phase = self.internal_state['phase']
             logger.info(f"Supervisor (ID: {self.state.agent_id}) phase: {phase}")

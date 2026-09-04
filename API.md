@@ -1115,3 +1115,232 @@ GET  /api/v1/queries/{query_id}/sources
 *Response (HTTP 200 OK):*
 `Binary Stream (application/zip)`
 
+## Phase 12 - Continuous Intelligence & Decision Monitoring
+
+```http
+POST   /api/v1/monitoring/jobs
+GET    /api/v1/monitoring/jobs
+GET    /api/v1/monitoring/jobs/{id}
+PATCH  /api/v1/monitoring/jobs/{id}
+DELETE /api/v1/monitoring/jobs/{id}
+POST   /api/v1/monitoring/jobs/{id}/run
+GET    /api/v1/monitoring/jobs/{id}/logs
+POST   /api/v1/monitoring/baselines
+GET    /api/v1/monitoring/baselines/{id}
+GET    /api/v1/monitoring/alerts
+POST   /api/v1/monitoring/alerts/{id}/acknowledge
+POST   /api/v1/memory/items
+GET    /api/v1/memory/items
+GET    /api/v1/memory/items/{id}
+PATCH  /api/v1/memory/items/{id}
+POST   /api/v1/memory/items/{id}/approve
+GET    /api/v1/memory/heuristics
+POST   /api/v1/memory/heuristics
+POST   /api/v1/memory/inject-context
+```
+
+### Endpoints Overview
+
+1. `POST /api/v1/monitoring/jobs`
+   - Creates a continuous research and decision monitoring job (`MonitoringJobCreate`). Accepts `name`, `schedule_type` (`CRON`, `INTERVAL`, `EVENT_DRIVEN`), `cron_expression`, `interval_seconds`, `alert_threshold`, `webhook_url`, and baseline snapshot references.
+2. `GET /api/v1/monitoring/jobs`
+   - Lists monitoring jobs filtered by `project_id`, `session_id`, or `status` (`ACTIVE`, `PAUSED`, etc.).
+3. `GET /api/v1/monitoring/jobs/{id}`
+   - Retrieves full configuration details for a specific monitoring job by ID.
+4. `PATCH /api/v1/monitoring/jobs/{id}`
+   - Updates monitoring job settings, schedule, alert threshold, status (e.g. pause or resume), or metadata.
+5. `DELETE /api/v1/monitoring/jobs/{id}`
+   - Deletes a monitoring job and cascades deletion to associated execution logs and decision alerts.
+6. `POST /api/v1/monitoring/jobs/{id}/run`
+   - Triggers a manual execution run for a monitoring job, calculating deltas against baseline snapshots and outputting execution logs.
+7. `GET /api/v1/monitoring/jobs/{id}/logs`
+   - Retrieves historical execution logs (`MonitoringExecutionLog`) for a job ordered by execution timestamp.
+8. `POST /api/v1/monitoring/baselines`
+   - Creates a new research baseline snapshot (`ResearchBaselineSnapshot`) containing claims, sources, assumptions, and decision state.
+9. `GET /api/v1/monitoring/baselines/{id}`
+   - Retrieves a baseline snapshot by ID.
+10. `GET /api/v1/monitoring/alerts`
+    - Lists decision alerts (`DecisionAlert`) filtered by `job_id`, `project_id`, `session_id`, `status` (`UNREAD`, `ACKNOWLEDGED`, `RESOLVED`), or `severity` (`INFO`, `WARNING`, `HIGH`, `CRITICAL`).
+11. `POST /api/v1/monitoring/alerts/{id}/acknowledge`
+    - Marks a decision alert as acknowledged.
+12. `POST /api/v1/memory/items`
+    - Creates a persistent project memory item (`ProjectMemoryItemCreate`) across types: `FACT`, `DECISION_TRAIL`, `REUSABLE_ASSUMPTION`, `PRIOR_CONCLUSION`, `LESSON_LEARNED`.
+13. `GET /api/v1/memory/items`
+    - Lists project memory items with filters for `project_id`, `session_id`, `memory_type`, `validity_status`, `human_approval_status`, or `key`.
+14. `GET /api/v1/memory/items/{id}`
+    - Retrieves a project memory item by ID.
+15. `PATCH /api/v1/memory/items/{id}`
+    - Updates a project memory item's summary, content, confidence, validity, human approval status, or tags.
+16. `POST /api/v1/memory/items/{id}/approve`
+    - Approves or rejects a candidate memory item or assumption (`approval_status`: `APPROVED` or `REJECTED`).
+17. `GET /api/v1/memory/heuristics`
+    - Retrieves domain-specific research heuristics (untrusted domain blacklists, effective query templates, verified tool execution patterns, failure modes) by `domain` string.
+18. `POST /api/v1/memory/heuristics`
+    - Adds or updates domain-specific research heuristics.
+19. `POST /api/v1/memory/inject-context`
+    - Previews project memory context injection payload and formatted markdown text for prompt generation.
+
+### JSON Examples
+
+**`POST /api/v1/monitoring/jobs`**
+*Request Body:*
+```json
+{
+  "name": "Cloud Infrastructure Competitor & Pricing Monitor",
+  "schedule_type": "CRON",
+  "cron_expression": "0 0 * * *",
+  "alert_threshold": 0.5,
+  "webhook_url": "https://hooks.example.com/alerts/radis",
+  "baseline_snapshot_id": "b1000000-0000-0000-0000-000000000001",
+  "metadata": {
+    "category": "infrastructure",
+    "owner": "devops-team"
+  }
+}
+```
+*Response (HTTP 201 Created):*
+```json
+{
+  "id": "j1234567-89ab-cdef-0123-456789abcdef",
+  "project_id": null,
+  "session_id": null,
+  "query_id": null,
+  "baseline_snapshot_id": "b1000000-0000-0000-0000-000000000001",
+  "name": "Cloud Infrastructure Competitor & Pricing Monitor",
+  "schedule_type": "CRON",
+  "cron_expression": "0 0 * * *",
+  "interval_seconds": null,
+  "status": "ACTIVE",
+  "alert_threshold": 0.5,
+  "webhook_url": "https://hooks.example.com/alerts/radis",
+  "last_run_at": null,
+  "next_run_at": "2026-09-06T00:00:00Z",
+  "run_count": 0,
+  "metadata": {
+    "category": "infrastructure",
+    "owner": "devops-team"
+  },
+  "created_at": "2026-09-05T00:45:00Z",
+  "updated_at": "2026-09-05T00:45:00Z"
+}
+```
+
+**`POST /api/v1/monitoring/jobs/{id}/run`**
+*Response (HTTP 200 OK):*
+```json
+{
+  "id": "e9999999-8888-7777-6666-555544443333",
+  "job_id": "j1234567-89ab-cdef-0123-456789abcdef",
+  "new_query_id": "q1111111-2222-3333-4444-555566667777",
+  "status": "ALERT_TRIGGERED",
+  "materiality_score": 0.675,
+  "materiality_level": "HIGH",
+  "delta_summary": {
+    "sub_scores": {
+      "s_assumption": 1.0,
+      "s_contradiction": 0.5,
+      "s_matrix": 1.0,
+      "s_source": 0.0
+    },
+    "diffs": {
+      "assumptions_invalidated": [{"text": "GCP pricing remains 20% lower than AWS", "status": "INVALIDATED"}],
+      "decision_drift": {
+        "baseline_recommendation": "Migrate to GCP TPU v4",
+        "current_recommendation": "Retain AWS EC2 P4d",
+        "recommendation_flipped": true
+      }
+    },
+    "recommendation_flipped": true,
+    "summary": "Recommendation flipped from 'Migrate to GCP TPU v4' to 'Retain AWS EC2 P4d'; 1 assumption(s) invalidated"
+  },
+  "alert_triggered": true,
+  "executed_at": "2026-09-05T00:46:00Z",
+  "execution_duration_seconds": 2.45,
+  "error_message": null
+}
+```
+
+**`POST /api/v1/memory/items`**
+*Request Body:*
+```json
+{
+  "memory_type": "REUSABLE_ASSUMPTION",
+  "key": "cloud_egress_pricing_growth",
+  "summary": "Assumed cloud egress cost growth rate stays below 15% per annum",
+  "content": {
+    "full_assumption": "Egress bandwidth growth remains under 15% YoY based on CDN optimizations.",
+    "category": "financial"
+  },
+  "confidence": 0.85,
+  "validity_status": "ACTIVE",
+  "human_approval_status": "PENDING",
+  "tags": ["cloud", "egress", "financial"]
+}
+```
+*Response (HTTP 201 Created):*
+```json
+{
+  "id": "m5555555-4444-3333-2222-111100009999",
+  "project_id": null,
+  "session_id": null,
+  "memory_type": "REUSABLE_ASSUMPTION",
+  "key": "cloud_egress_pricing_growth",
+  "summary": "Assumed cloud egress cost growth rate stays below 15% per annum",
+  "content": {
+    "full_assumption": "Egress bandwidth growth remains under 15% YoY based on CDN optimizations.",
+    "category": "financial"
+  },
+  "confidence": 0.85,
+  "source_query_id": null,
+  "validity_status": "ACTIVE",
+  "human_approval_status": "PENDING",
+  "tags": ["cloud", "egress", "financial"],
+  "created_at": "2026-09-05T00:46:30Z",
+  "updated_at": "2026-09-05T00:46:30Z"
+}
+```
+
+**`POST /api/v1/memory/inject-context`**
+*Request Body:*
+```json
+{
+  "domain": "cloud_computing",
+  "query_text": "Analyze AWS vs GCP cost structure for large ML workloads"
+}
+```
+*Response (HTTP 200 OK):*
+```json
+{
+  "context": {
+    "project_id": null,
+    "session_id": null,
+    "active_facts": [
+      {
+        "id": "m1111111-2222-3333-4444-555566667777",
+        "memory_type": "FACT",
+        "key": "fact_gcp_tpu_v4",
+        "summary": "GCP TPU v4 instances offer 3.2x higher FLOPS per dollar for Transformer training.",
+        "content": {"claim_type": "FACT"},
+        "confidence": 0.92,
+        "validity_status": "ACTIVE",
+        "human_approval_status": "APPROVED",
+        "tags": ["gcp", "tpu", "hardware"]
+      }
+    ],
+    "prior_conclusions": [],
+    "reusable_assumptions": [],
+    "lessons_learned": [],
+    "heuristics": {
+      "id": "h8888888-7777-6666-5555-444433332222",
+      "domain": "cloud_computing",
+      "untrusted_domains": ["unverified-cloud-blog.com"],
+      "effective_query_templates": ["{provider} benchmark instance pricing ML training"],
+      "verified_tool_patterns": [],
+      "failure_modes": []
+    }
+  },
+  "formatted_prompt_text": "### PERSISTENT PROJECT MEMORY CONTEXT ###\n\n#### Active Project Facts:\n- [fact_gcp_tpu_v4] GCP TPU v4 instances offer 3.2x higher FLOPS per dollar for Transformer training. (Confidence: 0.92)\n\n#### Domain Research Heuristics (cloud_computing):\n  - Untrusted Source Domains: unverified-cloud-blog.com\n  - Effective Query Templates: {provider} benchmark instance pricing ML training"
+}
+```
+
+
