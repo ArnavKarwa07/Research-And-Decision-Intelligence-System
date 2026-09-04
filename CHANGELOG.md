@@ -5,6 +5,32 @@ All notable changes to the Research And Decision Intelligence System (RADIS) wil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [10.0.0] - Phase 10 Release - 2026-09-04
+
+### Added (Phase 10 LLMOps & Evaluation Framework)
+- **Golden Benchmark Datasets (`GoldenDataset`, `GoldenTestCase`, `EvalRun`, `EvalResult`)**: Database ORM models and dataset service pre-seeded with 10+ standard decision and research test cases across 4 categories (`market_analysis`, `technical_feasibility`, `financial_evaluation`, `strategic_decision`).
+- **Mathematical Evaluation Engine (`EvalMetricsEngine`)**: Comprehensive metric calculators for:
+  - Vector/RAG Retrieval: `Precision@K`, `Recall@K`, `MRR`, `NDCG`.
+  - Claim Verification: `Hallucination Rate`, `Faithfulness`, `Evidence Groundedness`.
+  - Citation & Trajectory: `Citation Coverage`, `Citation Precision`, `Trajectory Efficiency`, `Tool Call Accuracy`, `Unnecessary Re-plan Penalty`.
+  - Decision Quality: `MCDA Criteria Weighting Score`, `Scenario Payoff Alignment`, `Sensitivity Tipping Point Validity`.
+- **OpenTelemetry & LangSmith Tracing (`OpenTelemetryService`)**: Hierarchical span context propagation across multi-agent execution graphs, tool calls, and LLM calls. Provides in-memory trace buffering and SSE telemetry streaming (`telemetry:span_started`, `telemetry:span_finished`).
+- **Agent Timeline & Gantt Visualization (`AgentTimelineService`, `AgentTimelineGantt.jsx`)**: Real-time step-by-step Gantt execution timeline tracking and SSE event streaming (`telemetry:agent_timeline_step`).
+- **Cost, Token & Latency Monitoring Dashboards (`CostTelemetryTracker`, `CostMetricsDashboard.jsx`)**: Granular metrics tracking token usage, latency distribution (p50, p90, p99 percentiles), and financial USD cost breakdown per agent role and model.
+- **Automated Regression Evaluation Harness (`RegressionHarnessService`, `EvaluationDashboard.jsx`)**: Regression harness runner comparing evaluation runs against baseline quality/cost benchmarks, computing metric deltas, and enforcing quality drop (<5%) and cost increase (<15%) ceilings.
+- **Specialist Evaluation Agent (`EvaluationAgent`)**: Dedicated agent implementing AGENTS.md typed contract (`EvaluationAgentInput`, `EvaluationAgentOutput`).
+- **Evaluation & Observability REST APIs**: 10 new REST API endpoints under `/api/v1/eval` and `/api/v1/observability`:
+  - `POST /api/v1/eval/datasets/seed`
+  - `POST /api/v1/eval/datasets`
+  - `GET /api/v1/eval/datasets`
+  - `POST /api/v1/eval/datasets/{id}/cases`
+  - `POST /api/v1/eval/runs`
+  - `GET /api/v1/eval/runs/{id}`
+  - `POST /api/v1/eval/regression/compare`
+  - `GET /api/v1/observability/traces/{run_id}`
+  - `GET /api/v1/observability/timeline/{run_id}`
+  - `GET /api/v1/observability/metrics/dashboard`
+
 ## [9.0.0] - Phase 9 Release - 2026-09-04
 
 ### Added (Phase 9 Production Agent Runtime)

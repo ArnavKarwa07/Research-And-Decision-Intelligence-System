@@ -17,6 +17,8 @@ from app.api.v1 import (
     hitl,
     safety,
     runtime,
+    eval as eval_router,
+    observability as observability_router,
 )
 
 
@@ -39,7 +41,5 @@ api_v1_router.include_router(data_analysis.router)
 api_v1_router.include_router(hitl.router)
 api_v1_router.include_router(safety.router)
 api_v1_router.include_router(runtime.router)
-
-
-
-
+api_v1_router.include_router(eval_router.router)
+api_v1_router.include_router(observability_router.router)

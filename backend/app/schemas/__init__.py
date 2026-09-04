@@ -64,6 +64,29 @@ from .hitl import (
     EvidenceOverrideRequest,
     AssumptionConfirmationRequest,
 )
+from .eval import (
+    RetrievalMetrics,
+    ClaimVerificationMetrics,
+    CitationMetrics,
+    TrajectoryMetrics,
+    DecisionQualityMetrics,
+    GoldenTestCaseCreate,
+    GoldenTestCaseResponse,
+    GoldenDatasetCreate,
+    GoldenDatasetResponse,
+    EvalRunCreate,
+    EvalRunResponse,
+    EvalResultResponse,
+    RegressionReport,
+)
+from .observability import (
+    TraceSpan,
+    TraceSummary,
+    AgentTimelineStep,
+    AgentTimelineResponse,
+    LatencyPercentiles,
+    CostDashboardMetrics,
+)
 
 __all__ = [
     "ErrorResponse",
@@ -143,6 +166,26 @@ __all__ = [
     "ClarificationResponse",
     "EvidenceOverrideRequest",
     "AssumptionConfirmationRequest",
+    "RetrievalMetrics",
+    "ClaimVerificationMetrics",
+    "CitationMetrics",
+    "TrajectoryMetrics",
+    "DecisionQualityMetrics",
+    "GoldenTestCaseCreate",
+    "GoldenTestCaseResponse",
+    "GoldenDatasetCreate",
+    "GoldenDatasetResponse",
+    "EvalRunCreate",
+    "EvalRunResponse",
+    "EvalResultResponse",
+    "RegressionReport",
+    "TraceSpan",
+    "TraceSummary",
+    "AgentTimelineStep",
+    "AgentTimelineResponse",
+    "LatencyPercentiles",
+    "CostDashboardMetrics",
 ]
+
 
 

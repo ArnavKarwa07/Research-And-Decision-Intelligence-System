@@ -81,12 +81,25 @@ Track:
 
 A change that improves answer quality but materially increases unsafe behavior or cost should not automatically ship.
 
-## 5. Human Evaluation
+## 6. Phase 10 Implemented Evaluation & Observability Architecture
 
-Use expert review for:
-- Difficult research questions
-- Ambiguous decisions
-- Contradictory evidence
-- High-impact recommendations
+### Implemented Services & Engine Modules
+- **`EvalMetricsEngine` (`eval_metrics_engine.py`)**: Computes `Precision@K`, `Recall@K`, `MRR`, `NDCG`, `Hallucination Rate`, `Faithfulness`, `Evidence Groundedness`, `Citation Coverage/Precision`, `Trajectory Efficiency`, `Tool Call Accuracy`, `Unnecessary Re-plan Penalty`, `MCDA Criteria Weight Alignment`, `Scenario Payoff Alignment`, and `Sensitivity Tipping Point Validity`.
+- **`EvalBenchmarkService` (`eval_benchmark_service.py`)**: Golden dataset and test case CRUD management and pre-seeding for market analysis, technical feasibility, financial evaluation, and strategic decisions.
+- **`OpenTelemetryService` (`open_telemetry_service.py`)**: Hierarchical span context tracing, in-memory buffering, and SSE span event streaming (`telemetry:span_started`, `telemetry:span_finished`).
+- **`AgentTimelineService` (`agent_timeline_service.py`)**: Real-time Gantt execution timeline tracking and SSE payload generation (`telemetry:agent_timeline_step`).
+- **`RegressionHarnessService` (`regression_harness_service.py`)**: Automated evaluation suite runner, baseline comparison, score delta computation, and pass/fail regression report generation.
+- **`EvaluationAgent` (`evaluation_agent.py`)**: Specialist evaluation agent obeying `AGENTS.md` typed contracts.
 
-Reviewers should score evidence quality separately from writing quality.
+### REST Endpoints (`/api/v1/eval` & `/api/v1/observability`)
+- `POST /api/v1/eval/datasets/seed`: Pre-seed default golden benchmark datasets
+- `POST /api/v1/eval/datasets`: Create golden dataset
+- `GET /api/v1/eval/datasets`: List golden datasets
+- `POST /api/v1/eval/datasets/{id}/cases`: Add ground-truth test case
+- `POST /api/v1/eval/runs`: Trigger evaluation run
+- `GET /api/v1/eval/runs/{id}`: Inspect evaluation report and metrics
+- `POST /api/v1/eval/regression/compare`: Compare evaluation run against baseline
+- `GET /api/v1/observability/traces/{run_id}`: Fetch OpenTelemetry trace summary
+- `GET /api/v1/observability/timeline/{run_id}`: Fetch Gantt chart execution timeline
+- `GET /api/v1/observability/metrics/dashboard`: Fetch token, USD cost, and latency (p50/p90/p99) metrics dashboard
+

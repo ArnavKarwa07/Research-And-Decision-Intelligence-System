@@ -146,12 +146,24 @@ class CostTelemetryTracker:
 
     def __init__(self):
         self._metrics: dict[UUID, QueryCostMetrics] = {}
+        self._latencies_ms: list[float] = []
+        self._agent_costs: dict[str, float] = {}
 
     def get_or_create_metrics(self, query_id: Union[UUID, str]) -> QueryCostMetrics:
         norm_id = _normalize_query_id(query_id)
         if norm_id not in self._metrics:
             self._metrics[norm_id] = QueryCostMetrics(query_id=norm_id)
         return self._metrics[norm_id]
+
+    def record_latency(self, latency_ms: float) -> None:
+        """Record execution latency sample in milliseconds."""
+        if latency_ms >= 0:
+            self._latencies_ms.append(float(latency_ms))
+
+    def record_agent_cost(self, agent_name: str, cost_usd: float) -> None:
+        """Record financial cost attributed to a specific agent role."""
+        if agent_name and cost_usd > 0:
+            self._agent_costs[agent_name] = self._agent_costs.get(agent_name, 0.0) + cost_usd
 
     def record_llm_call(
         self,
@@ -160,6 +172,8 @@ class CostTelemetryTracker:
         prompt_tokens: int,
         completion_tokens: int,
         custom_pricing: Optional[dict] = None,
+        agent_name: Optional[str] = None,
+        latency_ms: Optional[float] = None,
     ) -> float:
         """
         Record an LLM call, update cost metrics, and stream cost update SSE event.
@@ -177,6 +191,11 @@ class CostTelemetryTracker:
         metrics.total_cost += incremental_cost
 
         metrics.cost_by_model[model_name] = metrics.cost_by_model.get(model_name, 0.0) + incremental_cost
+
+        if agent_name:
+            self.record_agent_cost(agent_name, incremental_cost)
+        if latency_ms is not None:
+            self.record_latency(latency_ms)
 
         # Stream update via SSE
         emit_cost_updated(
@@ -196,6 +215,7 @@ class CostTelemetryTracker:
         tool_name: str,
         call_count: int = 1,
         custom_pricing: Optional[dict] = None,
+        agent_name: Optional[str] = None,
     ) -> float:
         """
         Record tool call(s), update cost metrics, and stream cost update SSE event.
@@ -211,6 +231,9 @@ class CostTelemetryTracker:
         metrics.total_cost += incremental_cost
 
         metrics.cost_by_tool[tool_name] = metrics.cost_by_tool.get(tool_name, 0.0) + incremental_cost
+
+        if agent_name:
+            self.record_agent_cost(agent_name, incremental_cost)
 
         # Stream update via SSE
         emit_cost_updated(
@@ -231,6 +254,53 @@ class CostTelemetryTracker:
         metrics = self.get_or_create_metrics(norm_id)
         return metrics.to_dict()
 
+    def get_latency_percentiles(self) -> dict[str, float]:
+        """Compute p50, p90, p99, min, max, avg latencies in ms."""
+        if not self._latencies_ms:
+            return {"p50_ms": 0.0, "p90_ms": 0.0, "p99_ms": 0.0, "avg_ms": 0.0, "min_ms": 0.0, "max_ms": 0.0}
+
+        sorted_lat = sorted(self._latencies_ms)
+        n = len(sorted_lat)
+
+        def percentile(p: float) -> float:
+            idx = int(round((p / 100.0) * (n - 1)))
+            return sorted_lat[min(idx, n - 1)]
+
+        return {
+            "p50_ms": round(percentile(50.0), 2),
+            "p90_ms": round(percentile(90.0), 2),
+            "p99_ms": round(percentile(99.0), 2),
+            "avg_ms": round(sum(sorted_lat) / float(n), 2),
+            "min_ms": round(sorted_lat[0], 2),
+            "max_ms": round(sorted_lat[-1], 2),
+        }
+
+    def get_aggregate_dashboard(self) -> dict[str, Any]:
+        """Compute system-wide aggregate token usage, financial costs, and latency distribution."""
+        total_prompt = sum(m.prompt_tokens for m in self._metrics.values())
+        total_comp = sum(m.completion_tokens for m in self._metrics.values())
+        total_tokens = sum(m.total_tokens for m in self._metrics.values())
+        llm_cost = sum(m.llm_cost for m in self._metrics.values())
+        tool_cost = sum(m.tool_cost for m in self._metrics.values())
+        total_cost = sum(m.total_cost for m in self._metrics.values())
+
+        cost_by_model: dict[str, float] = {}
+        for m in self._metrics.values():
+            for k, v in m.cost_by_model.items():
+                cost_by_model[k] = round(cost_by_model.get(k, 0.0) + v, 6)
+
+        return {
+            "total_tokens": total_tokens,
+            "prompt_tokens": total_prompt,
+            "completion_tokens": total_comp,
+            "total_cost_usd": round(total_cost, 6),
+            "llm_cost_usd": round(llm_cost, 6),
+            "tool_cost_usd": round(tool_cost, 6),
+            "cost_by_agent": {k: round(v, 6) for k, v in self._agent_costs.items()},
+            "cost_by_model": cost_by_model,
+            "latency_distribution": self.get_latency_percentiles(),
+        }
+
     def reset(self, query_id: Optional[Union[UUID, str]] = None) -> None:
         """Reset cost metrics."""
         if query_id:
@@ -238,7 +308,10 @@ class CostTelemetryTracker:
             self._metrics.pop(norm_id, None)
         else:
             self._metrics.clear()
+            self._latencies_ms.clear()
+            self._agent_costs.clear()
 
 
 # Default singleton instance
 cost_telemetry_tracker = CostTelemetryTracker()
+

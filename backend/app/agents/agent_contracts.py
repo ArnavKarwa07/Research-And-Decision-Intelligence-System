@@ -311,3 +311,24 @@ class DataVisualizationOutput(BaseModel):
     key_findings: List[str] = Field(default_factory=list)
     reproducible_artifact_id: Optional[str] = None
 
+
+# --- Evaluation Agent Contract ---
+class EvaluationAgentInput(BaseModel):
+    dataset_id: str
+    run_id: Optional[str] = None
+    model_name: str = "default"
+    prompt_version: str = "v1"
+    token_budget: int = 15000
+
+
+class EvaluationAgentOutput(BaseModel):
+    eval_run_id: str
+    dataset_id: str
+    overall_score: float
+    pass_rate: float
+    total_cost_usd: float
+    total_latency_ms: float
+    summary_message: str
+    eval_results: List[Dict[str, Any]] = Field(default_factory=list)
+
+
