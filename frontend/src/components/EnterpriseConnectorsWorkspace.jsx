@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../lib/api';
 
 const PROVIDER_ICONS = {
-  GOOGLE_DRIVE: '📁 Google Drive',
-  NOTION: '📝 Notion',
-  SLACK: '💬 Slack',
-  GMAIL: '✉️ Gmail',
-  SHAREPOINT: '🔷 SharePoint',
+  GOOGLE_DRIVE: ' Google Drive',
+  NOTION: ' Notion',
+  SLACK: ' Slack',
+  GMAIL: ' Gmail',
+  SHAREPOINT: ' SharePoint',
 };
 
 export default function EnterpriseConnectorsWorkspace({ activeWorkspaceId = 'default-workspace' }) {
@@ -97,7 +97,7 @@ export default function EnterpriseConnectorsWorkspace({ activeWorkspaceId = 'def
     <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto', color: '#e2e8f0' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: '24px', fontWeight: '600' }}>🔌 Enterprise Data Connectors Engine</h2>
+          <h2 style={{ margin: 0, fontSize: '24px', fontWeight: '600' }}> Enterprise Data Connectors Engine</h2>
           <p style={{ margin: '4px 0 0', color: '#94a3b8', fontSize: '14px' }}>
             Automated credential authorization, polling/webhook differential sync, text chunking, and Qdrant vector embedding.
           </p>
@@ -170,7 +170,7 @@ export default function EnterpriseConnectorsWorkspace({ activeWorkspaceId = 'def
                   cursor: syncingId === c.id ? 'not-allowed' : 'pointer',
                 }}
               >
-                {syncingId === c.id ? 'Syncing...' : '🔄 Sync Now'}
+                {syncingId === c.id ? 'Syncing...' : ' Sync Now'}
               </button>
               <button
                 onClick={() => handleViewHealth(c.id)}
@@ -184,7 +184,7 @@ export default function EnterpriseConnectorsWorkspace({ activeWorkspaceId = 'def
                   cursor: 'pointer',
                 }}
               >
-                📊 Health Metrics
+                 Health Metrics
               </button>
             </div>
           </div>
@@ -195,7 +195,7 @@ export default function EnterpriseConnectorsWorkspace({ activeWorkspaceId = 'def
       {selectedHealth && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
           <div style={{ backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '12px', padding: '24px', width: '500px', color: '#e2e8f0' }}>
-            <h3 style={{ margin: '0 0 16px 0', fontSize: '18px' }}>📊 Sync Health & Rate Limit Metrics</h3>
+            <h3 style={{ margin: '0 0 16px 0', fontSize: '18px' }}> Sync Health & Rate Limit Metrics</h3>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
               <div style={{ backgroundColor: '#1e293b', padding: '12px', borderRadius: '6px' }}>
                 <span style={{ fontSize: '12px', color: '#94a3b8' }}>Rate Limit Status</span>

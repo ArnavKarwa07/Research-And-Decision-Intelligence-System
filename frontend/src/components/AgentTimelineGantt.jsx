@@ -58,7 +58,7 @@ export default function AgentTimelineGantt({ runId, apiBase = '/api/v1' }) {
   return (
     <div style={{ background: '#0f172a', padding: '1.25rem', borderRadius: '10px', color: '#f8fafc' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-        <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#38bdf8' }}>⏱️ Multi-Agent Execution Timeline (Gantt)</h3>
+        <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#38bdf8' }}> Multi-Agent Execution Timeline (Gantt)</h3>
         {timeline && (
           <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
             Total Elapsed: <strong>{timeline.total_duration_ms?.toFixed(0)} ms</strong>

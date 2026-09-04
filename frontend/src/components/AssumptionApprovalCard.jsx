@@ -81,7 +81,7 @@ export default function AssumptionApprovalCard({ item, onStatusUpdated = null })
 
       {error && (
         <div className="p-2 bg-red-950/40 border border-red-500/50 rounded text-red-300 text-[10px]">
-          ⚠️ {error}
+           {error}
         </div>
       )}
 

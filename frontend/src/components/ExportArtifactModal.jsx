@@ -56,30 +56,31 @@ export default function ExportArtifactModal({ queryId, onClose }) {
           </div>
           <button
             onClick={onClose}
-            className="text-on-surface-variant hover:text-on-surface p-1 rounded font-bold text-lg cursor-pointer"
+            className="text-on-surface-variant hover:text-on-surface p-1 rounded font-bold text-lg cursor-pointer flex items-center justify-center"
           >
-            ✕
+            <span className="material-symbols-outlined text-xl">close</span>
           </button>
         </div>
 
         {/* Format Selector Bar */}
         <div className="flex gap-2 border-b border-outline-variant/40 pb-3 text-xs font-mono">
           {[
-            { id: 'ZIP', label: '📦 Complete ZIP Package' },
-            { id: 'MEMO', label: '📝 Decision Memo (MD)' },
-            { id: 'REPORT', label: '📊 Technical Report (MD)' },
-            { id: 'CSV', label: '📑 MCDA Matrix (CSV)' },
+            { id: 'ZIP', label: 'Complete ZIP Package', icon: 'folder_zip' },
+            { id: 'MEMO', label: 'Decision Memo (MD)', icon: 'article' },
+            { id: 'REPORT', label: 'Technical Report (MD)', icon: 'analytics' },
+            { id: 'CSV', label: 'MCDA Matrix (CSV)', icon: 'table_chart' },
           ].map(fmt => (
             <button
               key={fmt.id}
               onClick={() => handleFetchPreview(fmt.id)}
-              className={`px-3 py-1.5 rounded-lg font-bold transition-colors ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition-colors ${
                 activeFormat === fmt.id
                   ? 'bg-cyber-cyan text-black border border-cyber-cyan'
                   : 'bg-surface text-on-surface-variant hover:text-on-surface border border-outline-variant'
               }`}
             >
-              {fmt.label}
+              <span className="material-symbols-outlined text-sm">{fmt.icon}</span>
+              <span>{fmt.label}</span>
             </button>
           ))}
         </div>

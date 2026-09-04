@@ -80,7 +80,7 @@ export default function PlanViewTab({ plan = [], activeAgent = null, steps = [] 
               </div>
 
               <div className="pt-3 border-t border-outline-variant/40 flex justify-between items-center text-xs font-mono">
-                <span className="text-cyber-cyan font-bold">🤖 {task.assigned_agent || 'Supervisor'}</span>
+                <span className="text-cyber-cyan font-bold"> {task.assigned_agent || 'Supervisor'}</span>
                 <span className="text-on-surface-variant text-[10px]">Click to inspect &rarr;</span>
               </div>
             </div>
@@ -114,7 +114,7 @@ export default function PlanViewTab({ plan = [], activeAgent = null, steps = [] 
             </div>
             <div className="p-3 bg-surface rounded border border-outline-variant/60">
               <span className="font-mono text-[10px] text-on-surface-variant uppercase font-bold block mb-1">Checkpoint Status</span>
-              <span className="text-tertiary font-bold">✓ State Durable & Validated</span>
+              <span className="text-tertiary font-bold"> State Durable & Validated</span>
             </div>
           </div>
         </div>

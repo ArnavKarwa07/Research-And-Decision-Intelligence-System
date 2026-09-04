@@ -253,7 +253,7 @@ export default function MonitoringJobModal({
                     : 'bg-surface border-outline-variant text-on-surface-variant hover:border-cyber-cyan/50'
                 }`}
               >
-                ⏱️ INTERVAL (Seconds)
+                 INTERVAL (Seconds)
               </button>
               <button
                 type="button"
@@ -264,7 +264,7 @@ export default function MonitoringJobModal({
                     : 'bg-surface border-outline-variant text-on-surface-variant hover:border-cyber-cyan/50'
                 }`}
               >
-                📅 CRON Expression
+                 CRON Expression
               </button>
             </div>
           </div>

@@ -86,7 +86,7 @@ export default function EvidenceViewTab({ evidence = [], queryId = null }) {
                 onClick={() => setEditingEvidence(item)}
                 className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity px-2.5 py-1 bg-surface-variant border border-outline-variant text-on-surface rounded text-[11px] font-mono hover:border-primary"
               >
-                ✏️ Edit Evidence
+                 Edit Evidence
               </button>
             </div>
           ))}

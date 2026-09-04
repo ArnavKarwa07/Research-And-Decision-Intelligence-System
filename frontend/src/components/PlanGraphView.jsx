@@ -40,7 +40,7 @@ export default function PlanGraphView({ plan = [], activeAgent = null }) {
               </div>
               <div className="pt-2 border-t border-outline-variant/40 flex justify-between items-center text-[10px] font-mono text-on-surface-variant">
                 <span>{task.assigned_agent}</span>
-                <span className="text-tertiary">✓ READY</span>
+                <span className="text-tertiary"> READY</span>
               </div>
             </div>
           );

@@ -22,10 +22,6 @@ from app.api.v1 import (
     artifacts,
     monitoring,
     project_memory,
-    connectors,
-    auth_sso,
-    workspace,
-    governance_admin,
 )
 
 
@@ -52,9 +48,6 @@ api_v1_router.include_router(observability_router.router)
 api_v1_router.include_router(artifacts.router)
 api_v1_router.include_router(monitoring.router)
 api_v1_router.include_router(project_memory.router)
-api_v1_router.include_router(connectors.router)
-api_v1_router.include_router(auth_sso.router)
-api_v1_router.include_router(workspace.router)
-api_v1_router.include_router(governance_admin.router)
+
 
 

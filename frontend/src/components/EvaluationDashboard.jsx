@@ -89,7 +89,7 @@ export default function EvaluationDashboard({ apiBase = '/api/v1' }) {
   return (
     <div style={{ padding: '1.5rem', background: '#0f172a', color: '#f8fafc', borderRadius: '12px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-        <h2 style={{ margin: 0, fontSize: '1.25rem', color: '#38bdf8' }}>📊 LLMOps Golden Evaluation Benchmark</h2>
+        <h2 style={{ margin: 0, fontSize: '1.25rem', color: '#38bdf8' }}> LLMOps Golden Evaluation Benchmark</h2>
         <button
           onClick={handleTriggerRun}
           disabled={loading || !selectedDataset}
@@ -103,7 +103,7 @@ export default function EvaluationDashboard({ apiBase = '/api/v1' }) {
             fontWeight: 600,
           }}
         >
-          {loading ? 'Running Suite...' : '🚀 Execute Benchmark Suite'}
+          {loading ? 'Running Suite...' : ' Execute Benchmark Suite'}
         </button>
       </div>
 

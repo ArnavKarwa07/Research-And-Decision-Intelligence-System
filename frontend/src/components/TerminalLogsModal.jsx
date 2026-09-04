@@ -6,14 +6,14 @@ export default function TerminalLogsModal({ steps, onClose }) {
     <div className={styles.modalOverlay} onClick={onClose}>
       <div className={styles.modalBox} onClick={(e) => e.stopPropagation()}>
         <div className={styles.modalHeader}>
-          <span className={styles.modalTitle}>💻 RAW AGENT TELEMETRY LOGS</span>
+          <span className={styles.modalTitle}> RAW AGENT TELEMETRY LOGS</span>
           <button
             type="button"
             className={styles.closeBtn}
             aria-label="Close terminal logs modal"
             onClick={onClose}
           >
-            ✕
+            
           </button>
         </div>
         <div className={styles.modalBody}>

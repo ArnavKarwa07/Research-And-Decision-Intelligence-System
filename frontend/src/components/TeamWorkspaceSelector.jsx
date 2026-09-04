@@ -48,7 +48,7 @@ export default function TeamWorkspaceSelector({ activeWorkspaceId, onSelectWorks
       >
         {workspaces.map((w) => (
           <option key={w.id} value={w.id}>
-            🏢 {w.name}
+             {w.name}
           </option>
         ))}
       </select>

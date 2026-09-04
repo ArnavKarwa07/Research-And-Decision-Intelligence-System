@@ -31,7 +31,7 @@ export default function ApprovalGateCard({ gate, onResolve }) {
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
         <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 600, color: '#1a1a1a' }}>
-          🛡️ Action Required: Human Approval Gate
+           Action Required: Human Approval Gate
         </h4>
         <span style={{
           fontSize: '0.75rem',

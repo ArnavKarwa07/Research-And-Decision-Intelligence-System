@@ -144,7 +144,7 @@ export default function MaterialityDeltaViewer({
             Aggregated Materiality Score vs Alert Threshold
           </span>
           <span className={isAlertTriggered ? 'text-red-400 font-bold' : 'text-emerald-400 font-bold'}>
-            {isAlertTriggered ? '⚠️ EXCEEDS THRESHOLD — ALERT TRIGGERED' : '✅ BELOW ALERT THRESHOLD'}
+            {isAlertTriggered ? ' EXCEEDS THRESHOLD — ALERT TRIGGERED' : ' BELOW ALERT THRESHOLD'}
           </span>
         </div>
 
@@ -177,10 +177,10 @@ export default function MaterialityDeltaViewer({
       {/* Sub-Tabs Selector */}
       <div className="flex gap-2 border-b border-outline-variant pb-2 font-mono text-xs font-bold" role="tablist" aria-label="Delta Viewer Subtabs">
         {[
-          { id: 'breakdown', label: '🧮 Math Breakdown', count: null },
-          { id: 'claims', label: '🔴 Claim Drift', count: claimsDrift.length },
-          { id: 'assumptions', label: '⚠️ Assumptions', count: assumptionChanges.length },
-          { id: 'sources', label: '🌐 Source Scores', count: sourceChanges.length },
+          { id: 'breakdown', label: ' Math Breakdown', count: null },
+          { id: 'claims', label: ' Claim Drift', count: claimsDrift.length },
+          { id: 'assumptions', label: ' Assumptions', count: assumptionChanges.length },
+          { id: 'sources', label: ' Source Scores', count: sourceChanges.length },
         ].map((t) => (
           <button
             key={t.id}
@@ -298,7 +298,7 @@ export default function MaterialityDeltaViewer({
                     <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800">
                       {a.baseline_status}
                     </span>
-                    <span>➔</span>
+                    <span>-></span>
                     <span className="px-2 py-0.5 rounded bg-red-950 text-red-300 border border-red-800 font-bold">
                       {a.current_status}
                     </span>
@@ -331,9 +331,9 @@ export default function MaterialityDeltaViewer({
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="text-right">
-                    <div className="text-[10px] text-on-surface-variant">Baseline ➔ Current</div>
+                    <div className="text-[10px] text-on-surface-variant">Baseline -> Current</div>
                     <div className="text-xs font-bold text-on-surface">
-                      {formatPct(s.baseline_score)}% ➔ {formatPct(s.current_score)}%
+                      {formatPct(s.baseline_score)}% -> {formatPct(s.current_score)}%
                     </div>
                   </div>
                   <span

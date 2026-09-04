@@ -50,7 +50,7 @@ export default function EvidenceCard({ evidence }) {
             className="px-2 py-1 bg-surface-container border border-outline-variant rounded text-xs text-on-surface-variant hover:text-on-surface hover:border-primary transition-colors cursor-pointer"
             title="Copy Evidence Content"
           >
-            {copied ? '✓ Copied' : '📋 Copy'}
+            {copied ? ' Copied' : ' Copy'}
           </button>
         </div>
       </div>

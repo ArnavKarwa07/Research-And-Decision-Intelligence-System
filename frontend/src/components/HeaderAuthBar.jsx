@@ -41,13 +41,13 @@ export default function HeaderAuthBar({ user = { email: 'admin@enterprise.com', 
           cursor: 'pointer',
         }}
       >
-        🔐 SSO Auth & Sessions
+         SSO Auth & Sessions
       </button>
 
       {showSSODialog && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
           <div style={{ backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '12px', padding: '24px', width: '400px', color: '#e2e8f0' }}>
-            <h3 style={{ margin: '0 0 16px 0', fontSize: '18px' }}>🔐 Enterprise Single Sign-On (SSO)</h3>
+            <h3 style={{ margin: '0 0 16px 0', fontSize: '18px' }}> Enterprise Single Sign-On (SSO)</h3>
             <p style={{ fontSize: '13px', color: '#94a3b8', marginBottom: '20px' }}>
               Authenticate via enterprise identity provider to issue secure JWT sessions and enforce RBAC policies.
             </p>

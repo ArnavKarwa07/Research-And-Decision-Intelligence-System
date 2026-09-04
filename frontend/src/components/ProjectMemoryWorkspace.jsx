@@ -223,10 +223,10 @@ export default function ProjectMemoryWorkspace({
       {/* Primary Sub-Tabs Navigation Bar */}
       <div className="flex gap-2 border-b border-outline-variant pb-2 font-mono text-xs font-bold" role="tablist" aria-label="Project Memory Workspace Subtabs">
         {[
-          { id: 'items', label: '🗄️ Memory Trail Store', count: items.length },
-          { id: 'approvals', label: '✋ Human Assumption Approvals', count: pendingApprovalsCount },
-          { id: 'heuristics', label: '⚡ Domain Heuristics', count: null },
-          { id: 'injection', label: '🧩 Prompt Context Injection', count: null },
+          { id: 'items', label: ' Memory Trail Store', count: items.length },
+          { id: 'approvals', label: ' Human Assumption Approvals', count: pendingApprovalsCount },
+          { id: 'heuristics', label: ' Domain Heuristics', count: null },
+          { id: 'injection', label: ' Prompt Context Injection', count: null },
         ].map((t) => (
           <button
             key={t.id}

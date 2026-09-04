@@ -39,7 +39,7 @@ export default function EvidenceEditorModal({ claim, onClose, onSave }) {
         width: '100%',
         boxShadow: '0 4px 16px rgba(0,0,0,0.2)'
       }}>
-        <h3 style={{ marginTop: 0, color: '#1a1a1a' }}>✏️ Correct Evidence Claim</h3>
+        <h3 style={{ marginTop: 0, color: '#1a1a1a' }}> Correct Evidence Claim</h3>
 
         <div style={{ fontSize: '0.9rem', color: '#555', marginBottom: '16px', backgroundColor: '#f9f9f9', padding: '10px', borderRadius: '4px' }}>
           <strong>Claim:</strong> "{claim.content}"

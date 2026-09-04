@@ -29,7 +29,7 @@ export default function CostMetricsDashboard({ apiBase = '/api/v1' }) {
   return (
     <div style={{ background: '#0f172a', padding: '1.25rem', borderRadius: '10px', color: '#f8fafc' }}>
       <h3 style={{ margin: '0 0 1rem 0', fontSize: '1.1rem', color: '#facc15' }}>
-        💰 Cost, Token & Latency Monitoring (p50 / p90 / p99)
+         Cost, Token & Latency Monitoring (p50 / p90 / p99)
       </h3>
 
       {!dashboard ? (

@@ -52,10 +52,10 @@ export default function SecurityAuditLogModal({ isOpen, onClose }) {
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid #333', paddingBottom: '8px' }}>
           <h3 style={{ margin: 0, color: '#4ec9b0', fontSize: '1.1rem' }}>
-            🔒 Security Audit Log Viewer
+             Security Audit Log Viewer
           </h3>
           <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: '#888', fontSize: '1.2rem', cursor: 'pointer' }}>
-            ✖
+            
           </button>
         </div>
 

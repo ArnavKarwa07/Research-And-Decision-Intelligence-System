@@ -52,7 +52,7 @@ export function DataArtifactsModal({ queryId, onClose }) {
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
           <h2 style={{ margin: 0, fontSize: '1.25rem', color: '#38bdf8' }}>
-            ⚡ Reproducible Analysis Artifacts
+             Reproducible Analysis Artifacts
           </h2>
           <button
             onClick={onClose}

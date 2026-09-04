@@ -199,10 +199,10 @@ export default function DecisionAlertsPanel({
             className="bg-surface border border-outline-variant rounded px-2 py-1 text-on-surface focus:outline-none focus:border-cyber-cyan"
           >
             <option value="ALL">ALL SEVERITIES</option>
-            <option value="CRITICAL">🔴 CRITICAL</option>
-            <option value="HIGH">🟠 HIGH</option>
-            <option value="WARNING">🟡 WARNING</option>
-            <option value="INFO">🔵 INFO</option>
+            <option value="CRITICAL"> CRITICAL</option>
+            <option value="HIGH"> HIGH</option>
+            <option value="WARNING"> WARNING</option>
+            <option value="INFO"> INFO</option>
           </select>
         </div>
 

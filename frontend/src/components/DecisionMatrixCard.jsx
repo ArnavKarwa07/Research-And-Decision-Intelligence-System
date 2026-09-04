@@ -106,12 +106,12 @@ export default function DecisionMatrixCard({ decisionMatrix, confidence }) {
                       <div className="space-y-1 text-[11px]">
                         {pros && pros.length > 0 && (
                           <div className="text-tertiary flex items-start gap-1">
-                            <span>✓</span> <span>{pros.join(', ')}</span>
+                            <span></span> <span>{pros.join(', ')}</span>
                           </div>
                         )}
                         {cons && cons.length > 0 && (
                           <div className="text-error flex items-start gap-1">
-                            <span>✕</span> <span>{cons.join(', ')}</span>
+                            <span></span> <span>{cons.join(', ')}</span>
                           </div>
                         )}
                       </div>

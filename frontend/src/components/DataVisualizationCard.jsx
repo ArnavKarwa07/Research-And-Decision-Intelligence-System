@@ -20,7 +20,7 @@ export function DataVisualizationCard({ spec, tableData, keyFindings, queryId, o
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
         <div>
           <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#38bdf8', fontWeight: 600 }}>
-            📊 {spec?.title || 'Data Investigation & Visual Insights'}
+             {spec?.title || 'Data Investigation & Visual Insights'}
           </h3>
           {spec?.description && (
             <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#94a3b8' }}>{spec.description}</p>
@@ -71,7 +71,7 @@ export function DataVisualizationCard({ spec, tableData, keyFindings, queryId, o
                 fontWeight: 500
               }}
             >
-              ⚡ Reproducible Artifacts
+               Reproducible Artifacts
             </button>
           )}
         </div>

@@ -28,7 +28,7 @@ export default function ClarificationPromptCard({ clarification, onAnswer }) {
       marginBottom: '16px'
     }}>
       <h4 style={{ margin: '0 0 8px 0', color: '#7b1fa2', fontSize: '1.05rem' }}>
-        ❓ Clarification Required
+         Clarification Required
       </h4>
       <p style={{ margin: '0 0 12px 0', fontSize: '0.9rem', color: '#333' }}>
         {clarification.prompt}

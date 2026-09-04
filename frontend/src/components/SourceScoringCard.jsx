@@ -38,7 +38,7 @@ export default function SourceScoringCard({ source }) {
         <span className={styles.domain}>{domain}</span>
         <div className={styles.badges}>
           <span className={`${styles.badge} ${getFreshnessStyle(source.freshness)}`}>
-            {source.freshness === 'STALE' ? '⚠️ ' : ''}{source.freshness}
+            {source.freshness === 'STALE' ? ' ' : ''}{source.freshness}
           </span>
           {source.independence_group && (
             <span className={styles.badgeGrp}>Grp: {source.independence_group}</span>
