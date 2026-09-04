@@ -23,6 +23,10 @@ class AlternativeOptionInput(BaseModel):
     description: Optional[str] = None
     pros: List[str] = Field(default_factory=list)
     cons: List[str] = Field(default_factory=list)
+    scores: Dict[str, float] = Field(
+        default_factory=dict,
+        description="Optional map of criterion_id to score (0.0 - 1.0)"
+    )
 
 
 class AlternativeOptionScored(AlternativeOptionInput):

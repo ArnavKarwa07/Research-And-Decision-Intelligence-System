@@ -8,6 +8,7 @@ Tests endpoint schemas, status codes, and HTTP contract for:
 """
 import pytest
 from uuid import uuid4
+from unittest.mock import patch, AsyncMock
 from httpx import AsyncClient, ASGITransport
 
 from app.main import app
@@ -24,15 +25,24 @@ async def async_client():
 
 @pytest.fixture
 async def sample_session_and_query(async_client):
-    """Creates a real session and query in the DB for contract testing."""
+    """Creates a real session and query in the DB for contract testing.
+    
+    Patches out the LangGraph background research task to prevent the
+    2+ minute pipeline from running during contract tests.
+    """
     session_res = await async_client.post("/api/v1/sessions/", json={"title": "Phase 6 Contract Test"})
     assert session_res.status_code == 201
     session_id = session_res.json()["id"]
 
-    query_res = await async_client.post(
-        f"/api/v1/sessions/{session_id}/queries/",
-        json={"text": "Evaluate cloud infrastructure decision alternatives", "mode": "comprehensive"}
-    )
+    # Patch run_research so the LangGraph pipeline doesn't run during contract tests
+    with patch(
+        "app.services.query_service.QueryService.run_research",
+        new=AsyncMock(return_value=None)
+    ):
+        query_res = await async_client.post(
+            f"/api/v1/sessions/{session_id}/queries/",
+            json={"text": "Evaluate cloud infrastructure decision alternatives", "mode": "comprehensive"}
+        )
     assert query_res.status_code == 201
     query_id = query_res.json()["id"]
     return session_id, query_id

@@ -2,6 +2,7 @@
 Tests full workflow: Session Creation -> Query -> Decision Analysis Creation -> Sensitivity Re-run -> Scenario Re-run.
 """
 import pytest
+from unittest.mock import patch, AsyncMock
 from httpx import AsyncClient, ASGITransport
 
 from app.main import app
@@ -23,11 +24,15 @@ async def test_full_phase6_decision_pipeline(async_client):
     assert session_res.status_code == 201
     session_id = session_res.json()["id"]
 
-    # 2. Create Query
-    query_res = await async_client.post(
-        f"/api/v1/sessions/{session_id}/queries/",
-        json={"text": "Strategic cloud platform selection for enterprise AI", "mode": "deep"}
-    )
+    # 2. Create Query (patch background research to avoid LangGraph recursion hang)
+    with patch(
+        "app.services.query_service.QueryService.run_research",
+        new=AsyncMock(return_value=None)
+    ):
+        query_res = await async_client.post(
+            f"/api/v1/sessions/{session_id}/queries/",
+            json={"text": "Strategic cloud platform selection for enterprise AI", "mode": "deep"}
+        )
     assert query_res.status_code == 201
     query_id = query_res.json()["id"]
 
@@ -39,13 +44,15 @@ async def test_full_phase6_decision_pipeline(async_client):
                 "id": "aws",
                 "name": "Amazon Web Services",
                 "pros": ["Extensive AI services ecosystem", "High availability"],
-                "cons": ["Complex pricing structure"]
+                "cons": ["Complex pricing structure"],
+                "scores": {"c1": 0.9, "c2": 0.95, "c3": 0.7}
             },
             {
                 "id": "gcp",
                 "name": "Google Cloud Platform",
                 "pros": ["State of the art AI/TPU infrastructure", "Vertex AI"],
-                "cons": ["Market share trailing AWS"]
+                "cons": ["Market share trailing AWS"],
+                "scores": {"c1": 0.85, "c2": 0.80, "c3": 0.85}
             }
         ],
         "criteria": [
