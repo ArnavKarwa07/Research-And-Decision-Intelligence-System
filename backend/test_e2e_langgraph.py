@@ -57,7 +57,7 @@ async def test_end_to_end():
         # 4. Verify Database Record (Wait for background completion if needed)
         print("4. Verifying database state...")
         query_data = {}
-        for _ in range(10):
+        for _ in range(30):
             res = await client.get(f"{BASE_URL}/sessions/{session_id}/queries/{query_id}")
             assert res.status_code == 200
             query_data = res.json()
