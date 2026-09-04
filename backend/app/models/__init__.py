@@ -23,6 +23,7 @@ from app.models.approval_gate import ApprovalGate, ApprovalGateStatus, RiskLevel
 from app.models.clarification import ClarificationQuestion, ClarificationStatus
 from app.models.audit_log import AuditLog
 from app.models.eval_benchmark import GoldenDataset, GoldenTestCase, EvalRun, EvalResult
+from app.models.artifact import Artifact
 
 __all__ = [
     "Base",
@@ -57,7 +58,9 @@ __all__ = [
     "GoldenTestCase",
     "EvalRun",
     "EvalResult",
+    "Artifact",
 ]
+
 
 
 

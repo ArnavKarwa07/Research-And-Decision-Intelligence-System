@@ -5,7 +5,24 @@ All notable changes to the Research And Decision Intelligence System (RADIS) wil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [11.0.0] - Phase 11 Release - 2026-09-04
+
+### Added (Phase 11 Production UX & Artifact Export Package Engine)
+- **Enterprise Research Workspace Shell (`App.jsx`)**: Upgraded top-level application navigation from basic inline chat stream into a full-featured 6-tab enterprise Research Workspace layout (`Plan`, `Evidence`, `Decision`, `Agent Activity`, `Sources Repository`, `Claims Graph`).
+- **Interactive Plan & State Inspector (`PlanViewTab.jsx`)**: Dynamic visual graph of current research plan DAG, active subtasks, assigned subagent roles, dependencies, and state checkpoint inspector drawer.
+- **Evidence Explorer & Claim Mapping (`EvidenceViewTab.jsx`)**: Dedicated Evidence View displaying verified findings, claim-to-source mapping, confidence meters, evidence status filters (`Supported`, `Contradicted`, `Inferred`, `Assumption`), and Evidence Editor integration.
+- **Executive Decision Workspace & Weight Simulator (`DecisionViewTab.jsx`)**: Dedicated Decision View featuring primary recommendation banner, interactive MCDA comparison matrix (with dynamic criteria weight sliders), scenario simulations (Best/Base/Worst), sensitivity switch points, and decision tripwire triggers.
+- **Agent Activity & Telemetry Workspace (`AgentActivityTab.jsx`)**: Dedicated real-time Agent Activity timeline view featuring Gantt execution visualization, live tool call stream, token/cost monitoring dashboard, and terminal telemetry logs modal.
+- **Sources Repository & Domain Trust Index (`SourcesRepositoryTab.jsx`)**: Dedicated Sources repository view with search/filter tools, domain authority scores, publication dates, relevance scores, snippet previews, and source type filters (`Web`, `PDF`, `Database`, `Academic`).
+- **Claims Taxonomy & Lineage Provenance Graph (`ClaimsGraphTab.jsx`)**: Dedicated Claims graph view with filterable claim-to-source mapping graph and matrix distinguishing `FACT`, `CALCULATION`, `INFERENCE`, `ASSUMPTION`, `PREDICTION`, `OPINION`, and `UNRESOLVED` claims with quality ratings.
+- **Multi-Format Export Package Center & Generator (`ExportArtifactModal.jsx`, `ArtifactService`, `ExportPackageService`)**:
+  - Automated generation of structured executive decision memos and technical research reports (Markdown & standalone styled HTML).
+  - Tabular comparison exporter for MCDA criteria matrices as CSV and Markdown specs.
+  - One-click multi-format downloadable `.zip` package archive containing `decision_memo.md`, `research_report.md`, `executive_summary.html`, `research_state.json`, `sources_manifest.csv`, and `mcda_comparison.csv`.
+- **Artifact & Sources REST APIs (`artifacts.py`)**: Endpoints under `/api/v1/queries/{query_id}/artifacts/*` and `/api/v1/queries/{query_id}/sources` for memo compilation, report generation, comparison table exports, and ZIP package downloads.
+
 ## [10.0.0] - Phase 10 Release - 2026-09-04
+
 
 ### Added (Phase 10 LLMOps & Evaluation Framework)
 - **Golden Benchmark Datasets (`GoldenDataset`, `GoldenTestCase`, `EvalRun`, `EvalResult`)**: Database ORM models and dataset service pre-seeded with 10+ standard decision and research test cases across 4 categories (`market_analysis`, `technical_feasibility`, `financial_evaluation`, `strategic_decision`).

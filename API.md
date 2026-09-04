@@ -1053,5 +1053,65 @@ GET /api/runs/{run_id}/budget
     }
   }
 }
+```
+
+## Phase 11 - Production UX Artifacts & Export Packages
+
+```http
+POST /api/v1/queries/{query_id}/artifacts/decision-memo
+GET  /api/v1/queries/{query_id}/artifacts/decision-memo
+POST /api/v1/queries/{query_id}/artifacts/research-report
+GET  /api/v1/queries/{query_id}/artifacts/research-report
+GET  /api/v1/queries/{query_id}/artifacts/comparison-table
+GET  /api/v1/queries/{query_id}/artifacts/export-package
+GET  /api/v1/queries/{query_id}/sources
+```
+
+### JSON Examples
+
+**`POST /api/v1/queries/{query_id}/artifacts/decision-memo`**
+*Description:* Generates a structured executive decision memo containing executive summary, MCDA matrix, scenario projections (Best/Base/Worst), risk/assumption assessment, and footnote citations.
+*Response (HTTP 201 Created):*
+```json
+{
+  "id": "art-11112222-3333-4444-5555-666677778888",
+  "query_id": "q_45678901-1234-5678-1234-567812345678",
+  "title": "Executive Decision Memo: AWS vs GCP ML Workload Migration",
+  "artifact_type": "decision_memo",
+  "executive_summary": "Migrate primary training to GCP TPU/GPU instances while keeping data lake on AWS S3.",
+  "objective_and_constraints": {
+    "objective": "Compare AWS vs GCP for ML workloads with $5k/mo budget limit",
+    "confidence": 0.88
+  },
+  "mcda_comparison_matrix": {
+    "alternatives": [
+      {"name": "GCP TPU Instances", "weighted_score": 0.88},
+      {"name": "AWS EC2 P4d", "weighted_score": 0.76}
+    ],
+    "criteria": [
+      {"name": "Total Cost", "weight": 0.40},
+      {"name": "Performance", "weight": 0.35}
+    ]
+  },
+  "scenario_projections": [
+    {"name": "Best Case", "probability": 0.25, "description": "30% price reduction on TPU v4 preemptibles."},
+    {"name": "Base Case", "probability": 0.50, "description": "Target metrics met within budget."}
+  ],
+  "key_risks_and_assumptions": {
+    "risks": ["Egress bandwidth cost spikes"],
+    "assumptions": ["Workload scales 20% YoY"]
+  },
+  "citation_footnotes": [
+    {"index": 1, "title": "GCP TPU Pricing Guide", "publisher": "Google Cloud", "url": "https://cloud.google.com/tpu/pricing"}
+  ],
+  "markdown_content": "# EXECUTIVE DECISION MEMO\n...",
+  "html_content": "<div style=\"...\"><h1>EXECUTIVE DECISION MEMO</h1>...</div>",
+  "created_at": "2026-09-04T22:00:00Z"
 }
 ```
+
+**`GET /api/v1/queries/{query_id}/artifacts/export-package`**
+*Description:* Downloads a bundled `.zip` archive containing `decision_memo.md`, `research_report.md`, `executive_summary.html`, `research_state.json`, `sources_manifest.csv`, and `mcda_comparison.csv`.
+*Response (HTTP 200 OK):*
+`Binary Stream (application/zip)`
+

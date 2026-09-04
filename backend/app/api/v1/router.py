@@ -19,7 +19,9 @@ from app.api.v1 import (
     runtime,
     eval as eval_router,
     observability as observability_router,
+    artifacts,
 )
+
 
 
 
@@ -43,3 +45,5 @@ api_v1_router.include_router(safety.router)
 api_v1_router.include_router(runtime.router)
 api_v1_router.include_router(eval_router.router)
 api_v1_router.include_router(observability_router.router)
+api_v1_router.include_router(artifacts.router)
+

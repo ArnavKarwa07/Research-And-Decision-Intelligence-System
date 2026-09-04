@@ -17,6 +17,8 @@ if TYPE_CHECKING:
     from app.models.hypothesis import Hypothesis
     from app.models.critique_report import CritiqueReport
     from app.models.decision import Decision
+    from app.models.artifact import Artifact
+
 
 class Query(TimestampMixin, Base):
     """Database model for a user query."""
@@ -85,4 +87,10 @@ class Query(TimestampMixin, Base):
         back_populates="query",
         cascade="all, delete-orphan"
     )
+    artifacts: Mapped[list["Artifact"]] = relationship(
+        "Artifact",
+        back_populates="query",
+        cascade="all, delete-orphan"
+    )
+
 

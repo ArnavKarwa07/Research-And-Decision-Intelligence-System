@@ -11,6 +11,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from app.models.query import Query
     from app.models.document import Document
+    from app.models.artifact import Artifact
+
 
 class Session(TimestampMixin, Base):
     """Database model for a research session."""
@@ -38,4 +40,10 @@ class Session(TimestampMixin, Base):
         back_populates="session",
         cascade="all, delete-orphan"
     )
+    artifacts: Mapped[list["Artifact"]] = relationship(
+        "Artifact",
+        back_populates="session",
+        cascade="all, delete-orphan"
+    )
+
 

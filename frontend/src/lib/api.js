@@ -44,4 +44,19 @@ export const api = {
     method: 'POST',
     body: JSON.stringify(resolutionData),
   }),
+
+  getDecisionMemo: (queryId) => fetchApi(`/queries/${queryId}/artifacts/decision-memo`),
+  generateDecisionMemo: (queryId) => fetchApi(`/queries/${queryId}/artifacts/decision-memo`, { method: 'POST' }),
+  
+  getResearchReport: (queryId) => fetchApi(`/queries/${queryId}/artifacts/research-report`),
+  generateResearchReport: (queryId) => fetchApi(`/queries/${queryId}/artifacts/research-report`, { method: 'POST' }),
+  
+  getComparisonTable: (queryId) => fetchApi(`/queries/${queryId}/artifacts/comparison-table`),
+  getExportPackageUrl: (queryId) => `${BASE_URL}/queries/${queryId}/artifacts/export-package`,
+  
+  getSources: (queryId, sourceType = null) => {
+    const params = sourceType ? `?source_type=${sourceType}` : '';
+    return fetchApi(`/queries/${queryId}/sources${params}`);
+  },
 };
+
