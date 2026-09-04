@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     google_api_key: str = ''
     gemini_model: str = 'gemini-3.6-flash'
     
-    search_provider: Literal['duckduckgo', 'google', 'tavily'] = 'duckduckgo'
+    search_provider: Literal['duckduckgo', 'google', 'tavily', 'mock'] = 'duckduckgo'
     google_search_api_key: str = ''
     google_search_engine_id: str = ''
     tavily_api_key: str = ''

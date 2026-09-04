@@ -917,4 +917,141 @@ POST /api/v1/safety/check-injection
   "sanitized_content": "<untrusted_content source='web' injection_flagged='True'>\n[BLOCKED_INJECTION_PATTERN: ignore\\s+all\\s+previous\\s+instructions] System instructions neutralized.\n[BLOCKED_INJECTION_PATTERN: <script\\b[^>]*>] alert('xss')</script>\n</untrusted_content>"
 }
 ```
+
+## Production Agent Runtime (Phase 9)
+
+```http
+POST /api/v1/runtime/runs/{run_id}/pause
+POST /api/v1/runtime/runs/{run_id}/resume
+GET /api/v1/runtime/runs/{run_id}/checkpoints
+GET /api/v1/runtime/runs/{run_id}/budget
+
+POST /api/runs/{run_id}/pause
+POST /api/runs/{run_id}/resume
+GET /api/runs/{run_id}/checkpoints
+GET /api/runs/{run_id}/budget
+```
+
+### Endpoints Overview
+
+1. `POST /api/v1/runtime/runs/{run_id}/pause` (and `/api/runs/{run_id}/pause`)
+   - Pauses an active research run. Updates job queue status to `paused`.
+2. `POST /api/v1/runtime/runs/{run_id}/resume` (and `/api/runs/{run_id}/resume`)
+   - Resumes a paused or failed research run, re-enqueuing it for execution from its latest step checkpoint.
+3. `GET /api/v1/runtime/runs/{run_id}/checkpoints` (and `/api/runs/{run_id}/checkpoints`)
+   - Retrieves all step-level state checkpoints recorded for a research run.
+4. `GET /api/v1/runtime/runs/{run_id}/budget` (and `/api/runs/{run_id}/budget`)
+   - Retrieves multi-dimension budget tracking statistics (token usage, search count, tool calls, wall-clock duration) and soft/hard limit status.
+
+### SSE Telemetry Event Types (Phase 9)
+
+- `telemetry:cost_updated`: Emitted on each LLM or tool execution with incremental cost and query cost metrics breakdown.
+- `telemetry:budget_updated`: Emitted when general budget stats update.
+- `telemetry:budget_warning`: Emitted when a soft budget limit (80% utilization) is reached.
+- `telemetry:budget_exceeded`: Emitted when a hard budget limit is hit and execution halts.
+
+### JSON Examples
+
+**`POST /api/v1/runtime/runs/{run_id}/pause`**
+*Response (HTTP 200 OK):*
+```json
+{
+  "run_id": "run-88889999-4444-1111-2222-333344445555",
+  "job_id": "job-a1b2c3d4e5",
+  "status": "paused",
+  "message": "Run 'run-88889999-4444-1111-2222-333344445555' successfully paused."
+}
+```
+
+**`POST /api/v1/runtime/runs/{run_id}/resume`**
+*Response (HTTP 200 OK):*
+```json
+{
+  "run_id": "run-88889999-4444-1111-2222-333344445555",
+  "job_id": "job-a1b2c3d4e5",
+  "status": "queued",
+  "latest_checkpoint_id": "chk-run-8888-2",
+  "message": "Run 'run-88889999-4444-1111-2222-333344445555' successfully resumed."
+}
+```
+
+**`GET /api/v1/runtime/runs/{run_id}/checkpoints`**
+*Response (HTTP 200 OK):*
+```json
+{
+  "run_id": "run-88889999-4444-1111-2222-333344445555",
+  "count": 2,
+  "checkpoints": [
+    {
+      "checkpoint_id": "chk-run-8888-1",
+      "run_id": "run-88889999-4444-1111-2222-333344445555",
+      "step_name": "supervisor_step",
+      "step_index": 1,
+      "state": {
+        "text": "Analyze cloud migration options",
+        "mode": "comprehensive",
+        "plan": ["web_search", "synthesis"]
+      },
+      "claims": [],
+      "sources": [],
+      "agent_outputs": {},
+      "timestamp": "2026-09-04T20:00:00Z"
+    },
+    {
+      "checkpoint_id": "chk-run-8888-2",
+      "run_id": "run-88889999-4444-1111-2222-333344445555",
+      "step_name": "research_step",
+      "step_index": 2,
+      "state": {
+        "text": "Analyze cloud migration options",
+        "mode": "comprehensive",
+        "snippets": [{"url": "https://example.com/cloud", "title": "Cloud Benchmarks"}]
+      },
+      "claims": [],
+      "sources": [{"url": "https://example.com/cloud", "score": 0.85}],
+      "agent_outputs": {"summary": "Preliminary findings gathered."},
+      "timestamp": "2026-09-04T20:02:15Z"
+    }
+  ]
+}
+```
+
+**`GET /api/v1/runtime/runs/{run_id}/budget`**
+*Response (HTTP 200 OK):*
+```json
+{
+  "run_id": "run-88889999-4444-1111-2222-333344445555",
+  "hard_limit_exceeded": false,
+  "hard_limit_reason": null,
+  "soft_warnings": [],
+  "budget_stats": {
+    "tokens": {
+      "prompt": 12500,
+      "completion": 3200,
+      "total": 15700,
+      "max": 100000,
+      "soft_limit": 80000,
+      "utilization": 0.157
+    },
+    "searches": {
+      "conducted": 4,
+      "max": 20,
+      "soft_limit": 16,
+      "utilization": 0.20
+    },
+    "tools": {
+      "calls": 8,
+      "max": 50,
+      "soft_limit": 40,
+      "utilization": 0.16
+    },
+    "wall_clock": {
+      "elapsed_seconds": 45.2,
+      "max_seconds": 300.0,
+      "soft_limit_seconds": 240.0,
+      "utilization": 0.1507
+    }
+  }
+}
+}
 ```

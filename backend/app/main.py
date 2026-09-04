@@ -6,13 +6,19 @@ from typing import AsyncGenerator
 
 from app.config import Settings
 from app.db.engine import init_db
+from app.services.worker_pool import global_worker_pool
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Lifespan event handler for the FastAPI app."""
     # Initialize DB on startup
     await init_db()
+    # Start worker pool on startup
+    await global_worker_pool.start()
+    app.state.worker_pool = global_worker_pool
     yield
+    # Stop worker pool on shutdown
+    await global_worker_pool.stop()
 
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
@@ -34,7 +40,9 @@ def create_app() -> FastAPI:
     )
     
     from app.api.v1.router import api_v1_router
+    from app.api.v1.runtime import direct_runs_router
     app.include_router(api_v1_router)
+    app.include_router(direct_runs_router, prefix="/api")
 
         
     @app.get("/health")
@@ -45,3 +53,4 @@ def create_app() -> FastAPI:
     return app
 
 app = create_app()
+

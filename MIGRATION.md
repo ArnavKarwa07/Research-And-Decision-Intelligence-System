@@ -1,6 +1,41 @@
 # Migration Guide
 
-This document outlines database migration strategies and provides a roadmap for transitioning the Research And Decision Intelligence System (RADIS) from Phase 1 to Phase 8.
+This document outlines database migration strategies and provides a roadmap for transitioning the Research And Decision Intelligence System (RADIS) from Phase 1 to Phase 9.
+
+## Phase 9 Implemented Production Agent Runtime & Checkpointing Architecture
+
+Phase 9 introduces the Production Agent Runtime featuring async worker pool management, step-level state checkpointing and restoration, multi-dimension budget controls, and real-time SSE cost telemetry.
+
+### 1. Storage & Persistence Architecture
+
+Phase 9 utilizes existing database schemas while extending execution state tracking through `AgentRun` ORM model (`app.models.agent_run`):
+
+1. **`AgentRun.execution_log` (JSON Field Storage):**
+   - **`checkpoints` Array**: Stores serialized `Checkpoint` snapshots (`checkpoint_id`, `run_id`, `step_name`, `step_index`, `state`, `claims`, `sources`, `agent_outputs`, `timestamp`).
+   - **`latest_checkpoint_id` String**: References the most recent valid step checkpoint identifier.
+   - **`budget_stats` Object**: Stores multi-dimension budget usage statistics (`tokens`, `searches`, `tools`, `wall_clock`).
+2. **`AgentRun` Existing Column Synchronizations:**
+   - `tokens_used`: Automatically updated with total prompt + completion token usage across all steps.
+   - `elapsed_seconds`: Automatically updated with total wall-clock duration in seconds.
+
+### 2. Environment Configuration Settings (`app/config.py`)
+
+The following Phase 9 configuration variables govern background worker execution pool and default multi-dimension budget limits:
+
+| Variable | Default Value | Description |
+| :--- | :--- | :--- |
+| `WORKER_POOL_CONCURRENCY` | `4` | Maximum concurrent worker tasks in `AsyncWorkerPool` |
+| `DEFAULT_MAX_TOKENS` | `100000` | Default hard token limit per research run |
+| `DEFAULT_MAX_SEARCHES` | `20` | Default hard search query limit per research run |
+| `DEFAULT_MAX_TOOL_CALLS` | `50` | Default hard aggregate tool execution limit per research run |
+| `DEFAULT_MAX_WALL_CLOCK_SECONDS` | `300.0` | Default hard wall-clock execution limit (5 minutes) |
+| `DEFAULT_SOFT_LIMIT_RATIO` | `0.8` | Warning threshold ratio for soft budget alerts (80%) |
+
+### 3. State Resumption & Backward Compatibility
+
+- **Zero-Downtime Migration**: Phase 9 requires **no raw DB migration scripts** or schema breaking changes. All checkpoint and budget telemetry state is stored cleanly inside existing JSON `execution_log` payloads.
+- **Graceful Run Resumption**: When calling `/api/v1/runtime/runs/{id}/resume` or `resume_run_from_checkpoint`, the engine retrieves the latest checkpoint from `CheckpointEngine` memory or falls back to `AgentRun.execution_log["checkpoints"]` DB storage to reconstruct complete typed `AgentState`.
+- **Backward Compatibility**: Pre-Phase 9 queries and agent runs function without modification. Uncheckpointed runs default to standard execution state without interruption.
 
 ## Phase 8 Implemented Schema & Safety Additions (Human-in-the-Loop & Tool Security)
 

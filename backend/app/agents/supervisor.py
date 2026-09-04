@@ -11,11 +11,13 @@ class SupervisorInput(BaseModel):
     query_text: str
     session_id: str
     user_preferences: dict[str, Any] = Field(default_factory=dict)
+    run_id: str | None = None
 
 class ResearchObjective(BaseModel):
     query: str
     objective: str
     depth: Literal['shallow', 'deep'] = 'shallow'
+    processed: bool = False
 
 class ResearchPlan(BaseModel):
     objectives: list[ResearchObjective]
@@ -35,6 +37,7 @@ class SupervisorAgent(BaseAgent):
     - Spawn Research agent
     - Evaluate results (Synthesize or re-plan)
     Must follow dynamic planning (Rule 5) and evidence rules (Rule 6).
+    Enforces budget check gates before delegating sub-tasks and handles budget exhaustion gracefully.
     """
     
     def __init__(self, config: AgentConfig | None = None):
@@ -51,8 +54,31 @@ class SupervisorAgent(BaseAgent):
             'plan': None,
             'evidence': [],
             'sub_agents': [],
-            'query': ''
+            'query': '',
+            'run_id': None,
+            'budget_capped': False,
+            'processed_indices': set(),
         }
+
+    def _check_budget_exhausted(self) -> tuple[bool, str]:
+        """Check if run budget or agent token limit has been exhausted."""
+        run_id = self.internal_state.get('run_id')
+        if run_id:
+            from app.services.budget_service import budget_service
+            rb = budget_service.get_run_budget(run_id)
+            if rb:
+                hard_exceeded, hard_reason, _ = rb.check_limits()
+                if hard_exceeded:
+                    return True, hard_reason or f"Run budget hard limit exceeded for run '{run_id}'"
+
+        if self.state.tokens_used >= self.config.max_tokens:
+            return True, f"Token budget exhausted ({self.state.tokens_used}/{self.config.max_tokens})"
+
+        stop, reason = self.should_stop()
+        if stop and ('budget' in reason.lower() or 'token' in reason.lower() or 'max' in reason.lower()):
+            return True, reason
+
+        return False, ""
 
     async def step(self, input_data: dict[str, Any]) -> StepResult:
         """Determine next action based on internal phase."""
@@ -62,6 +88,10 @@ class SupervisorAgent(BaseAgent):
                 typed_input = SupervisorInput(**input_data)
                 self.internal_state['query'] = typed_input.query_text
                 self.internal_state['user_preferences'] = typed_input.user_preferences
+                if typed_input.run_id:
+                    self.internal_state['run_id'] = typed_input.run_id
+                elif input_data.get('run_id'):
+                    self.internal_state['run_id'] = str(input_data.get('run_id'))
                 
             phase = self.internal_state['phase']
             logger.info(f"Supervisor (ID: {self.state.agent_id}) phase: {phase}")
@@ -110,22 +140,60 @@ class SupervisorAgent(BaseAgent):
         )
 
     async def _execute_research(self) -> StepResult:
-        """Spawn research agents via tools or internal logic."""
-        # Here we mock the 'spawn_agent' tool call, assuming tool_registry handles it.
-        # For simplicity in this implementation, we will invoke the tool for the first objective.
-        
-        plan: ResearchPlan = self.internal_state['plan']
-        
-        # If we have unprocessed objectives, spawn a research agent for them
-        unprocessed = [obj for obj in plan.objectives if not hasattr(obj, 'processed')]
-        
+        """Spawn research agents via tools or internal logic with budget check gates."""
+        # Budget Check Gate prior to delegating sub-tasks
+        is_exhausted, reason = self._check_budget_exhausted()
+        if is_exhausted:
+            logger.warning(f"Supervisor budget gate triggered: {reason}. Capping research and triggering immediate synthesis.")
+            self.internal_state['phase'] = 'synthesizing'
+            self.internal_state['budget_capped'] = True
+            return StepResult(
+                action="cap_research",
+                message=f"Budget exhausted ({reason}). Capping research and triggering immediate synthesis with accumulated evidence.",
+                should_continue=True
+            )
+
+        plan: ResearchPlan | None = self.internal_state.get('plan')
+        if not plan or not plan.objectives:
+            self.internal_state['phase'] = 'evaluating'
+            return StepResult(action="spawn_agents", message="No objectives to dispatch.")
+
+        processed_indices = self.internal_state.setdefault('processed_indices', set())
+        unprocessed = [(idx, obj) for idx, obj in enumerate(plan.objectives) if idx not in processed_indices]
         if not unprocessed:
             self.internal_state['phase'] = 'evaluating'
             return StepResult(action="spawn_agents", message="All objectives dispatched.")
-            
-        obj = unprocessed[0]
-        setattr(obj, 'processed', True)
-        
+
+        idx, obj = unprocessed[0]
+
+        # Check / create sub-task budget if run_id is active
+        run_id = self.internal_state.get('run_id')
+        if run_id:
+            from app.services.budget_service import budget_service, BudgetExceededError
+            try:
+                sub_task_id = f"subtask-{idx + 1}"
+                sub_b = budget_service.create_sub_task_budget(run_id=run_id, sub_task_id=sub_task_id)
+                if sub_b.token_budget.remaining() <= 0 or sub_b.search_budget.remaining() <= 0:
+                    logger.warning(f"Sub-task budget remaining is zero for run {run_id}. Capping research.")
+                    self.internal_state['phase'] = 'synthesizing'
+                    self.internal_state['budget_capped'] = True
+                    return StepResult(
+                        action="cap_research",
+                        message="Sub-task budget exhausted. Capping research and triggering immediate synthesis.",
+                        should_continue=True
+                    )
+            except BudgetExceededError as e:
+                logger.warning(f"Sub-task budget allocation failed: {e}. Capping research.")
+                self.internal_state['phase'] = 'synthesizing'
+                self.internal_state['budget_capped'] = True
+                return StepResult(
+                    action="cap_research",
+                    message=f"Budget limit exceeded ({e}). Capping research and triggering immediate synthesis.",
+                    should_continue=True
+                )
+
+        processed_indices.add(idx)
+
         try:
             tool_res = await self.call_tool("spawn_agent", {
                 "agent_type": "research",
@@ -135,59 +203,95 @@ class SupervisorAgent(BaseAgent):
                     "depth": obj.depth
                 }
             })
-            
+
             if tool_res.success:
-                self.internal_state['evidence'].extend(tool_res.data.get("evidence", []))
+                evidence_items = tool_res.data.get("evidence", []) if isinstance(tool_res.data, dict) else []
+                self.internal_state['evidence'].extend(evidence_items)
                 return StepResult(action="spawn_agent", message=f"Spawned research for: {obj.query}")
             else:
-                return StepResult(action="spawn_agent", message=f"Failed to spawn agent: {tool_res.error}")
-                
-        except PermissionError as e:
-            logger.error(str(e))
-            self.internal_state['phase'] = 'evaluating' # Force evaluate on failure
+                return StepResult(action="spawn_agent", message=f"Failed to spawn agent: {getattr(tool_res, 'error', 'Unknown error')}")
+
+        except Exception as e:
+            from app.services.budget_service import BudgetExceededError
+            if isinstance(e, (PermissionError, BudgetExceededError)):
+                logger.warning(f"Sub-task execution capped due to constraint: {e}. Triggering immediate synthesis.")
+                self.internal_state['phase'] = 'synthesizing'
+                self.internal_state['budget_capped'] = True
+                return StepResult(
+                    action="cap_research",
+                    message=f"Research capped due to constraint: {e}. Triggering immediate synthesis.",
+                    should_continue=True
+                )
+            logger.error(f"Error in research execution: {e}")
+            self.internal_state['phase'] = 'evaluating'
             return StepResult(action="error", message=str(e))
-            
 
     async def _evaluate_results(self) -> StepResult:
         """Evaluate if we have enough evidence to answer the query."""
         evidence = self.internal_state['evidence']
-        
+
+        if self.internal_state.get('budget_capped'):
+            logger.info("Budget capped prior to evaluation. Synthesizing with accumulated evidence.")
+            self.internal_state['phase'] = 'synthesizing'
+            return StepResult(
+                action="evaluate",
+                message=f"Budget capped. Proceeding directly to synthesize {len(evidence)} accumulated evidence items."
+            )
+
         if not evidence:
             self.internal_state['phase'] = 'synthesizing'
             return StepResult(action="evaluate", message="No evidence found, proceeding to synthesize failure.")
-            
-        # Simplified evaluation: just proceed to synthesis
+
         self.internal_state['phase'] = 'synthesizing'
         return StepResult(action="evaluate", message=f"Evaluated {len(evidence)} pieces of evidence. Ready to synthesize.")
 
     async def _synthesize(self) -> StepResult:
-        """Generate final summary and confidence."""
+        """Generate final summary and confidence using accumulated evidence."""
+        accumulated_evidence = self.internal_state.get('evidence', [])
+        budget_capped = self.internal_state.get('budget_capped', False)
+
         if not self._llm_provider:
-            raise RuntimeError("LLM provider missing")
-            
+            summary_prefix = "[BUDGET CAPPED] " if budget_capped else ""
+            self.internal_state['final_summary'] = f"{summary_prefix}Synthesized from {len(accumulated_evidence)} evidence items."
+            self.internal_state['confidence'] = 0.75 if budget_capped else 0.85
+            self.internal_state['phase'] = 'done'
+            return StepResult(
+                action="synthesize",
+                message="Synthesis complete.",
+                should_continue=False
+            )
+
         system_prompt = (
             "Synthesize the research evidence into a final summary. "
             "Report confidence. Distinguish FACT from INFERENCE. "
             "Do not expose hidden chain-of-thought."
         )
-        user_prompt = f"Query: {self.internal_state['query']}\nEvidence: {json.dumps(self.internal_state['evidence'])}"
-        
+        if budget_capped:
+            system_prompt += " Note: Research was capped early due to budget constraints; synthesize using all available accumulated evidence."
+
+        user_prompt = f"Query: {self.internal_state['query']}\nEvidence: {json.dumps(accumulated_evidence)}"
+
         resp = await self._llm_provider.generate(
             messages=[
                 Message(role="system", content=system_prompt),
                 Message(role="user", content=user_prompt)
             ]
         )
-        
-        self.internal_state['final_summary'] = resp.content
-        self.internal_state['confidence'] = 0.85 # Mock confidence computation
+
+        summary_text = resp.content
+        if budget_capped and not summary_text.startswith("[BUDGET CAPPED]"):
+            summary_text = f"[BUDGET CAPPED] {summary_text}"
+
+        self.internal_state['final_summary'] = summary_text
+        self.internal_state['confidence'] = 0.75 if budget_capped else 0.85
         self.internal_state['phase'] = 'done'
-        
+
+        tokens = getattr(resp, 'tokens_used', 0)
         return StepResult(
-            action="synthesize", 
-            message="Synthesis complete.", 
+            action="synthesize",
+            message="Synthesis complete.",
             should_continue=False,
-            tokens_used=resp.tokens_used
+            tokens_used=tokens
         )
 
     async def compile_output(self) -> dict[str, Any]:
@@ -199,3 +303,4 @@ class SupervisorAgent(BaseAgent):
             confidence_score=self.internal_state.get('confidence', 0.0)
         )
         return output.model_dump()
+

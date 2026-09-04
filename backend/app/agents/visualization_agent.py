@@ -18,6 +18,16 @@ class DataVisualizationAgent:
         """Transforms structured data into visualization specs and key findings."""
         logger.info(f"[DataVisualizationAgent] Generating chart '{input_data.title}' ({input_data.chart_type})")
 
+        parsed_query_id = None
+        if input_data.query_id:
+            if isinstance(input_data.query_id, uuid.UUID):
+                parsed_query_id = input_data.query_id
+            else:
+                try:
+                    parsed_query_id = uuid.UUID(str(input_data.query_id))
+                except (ValueError, TypeError, AttributeError):
+                    parsed_query_id = uuid.uuid5(uuid.NAMESPACE_DNS, str(input_data.query_id))
+
         spec_res = self.chart_tool.generate_chart_spec(
             title=input_data.title,
             chart_type=input_data.chart_type,
@@ -25,7 +35,7 @@ class DataVisualizationAgent:
             x_axis=input_data.x_axis,
             y_axis=input_data.y_axis,
             description=input_data.description,
-            query_id=uuid.UUID(input_data.query_id) if input_data.query_id else None,
+            query_id=parsed_query_id,
         )
 
         return DataVisualizationOutput(

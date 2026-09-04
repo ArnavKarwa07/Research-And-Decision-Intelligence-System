@@ -5,7 +5,6 @@ import os
 import logging
 import json
 
-from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage, BaseMessage
 from app.config import settings
 
@@ -81,6 +80,7 @@ class GeminiProvider(LLMProvider):
         if not self.api_key:
             logger.warning("GEMINI_API_KEY not found. GeminiProvider will fail if invoked.")
             
+        from langchain_google_genai import ChatGoogleGenerativeAI
         self.llm = ChatGoogleGenerativeAI(
             model=self.model_name,
             GEMINI_API_KEY=self.api_key,

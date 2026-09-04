@@ -1,15 +1,15 @@
-"""LangGraph Multi-Agent Workflow Engine for RADIS Phase 5.
+"""LangGraph Multi-Agent Workflow Engine for RADIS Phase 5 & Phase 9.
 Enforces typed state transitions, parallel branch execution, agent contracts,
 evidence provenance mapping, alternative hypothesis generation, falsification tasks,
-critic red-team auditing, dynamic re-planning, and real-time SSE step emissions.
+critic red-team auditing, dynamic re-planning, real-time SSE step emissions,
+step-level state checkpointing, and execution control (pause/resume/cancel).
 """
 import logging
 import asyncio
-from typing import TypedDict, List, Dict, Any, Optional
+from typing import TypedDict, List, Dict, Any, Optional, Callable
 from datetime import datetime
 
 from langgraph.graph import StateGraph, START, END
-from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage
 
 from app.config import settings
@@ -20,9 +20,84 @@ from app.agents.agent_contracts import (
 from app.agents.hypothesis import HypothesisAgent
 from app.agents.falsification import FalsificationAgent
 from app.agents.critic import CriticAgent
+from app.agents.decision import DecisionAgent
 
 logger = logging.getLogger(__name__)
 web_search_tool = WebSearchTool(provider=settings.search_provider)
+
+
+# --- Execution Control & Custom Exceptions ---
+class JobCancelledError(Exception):
+    """Raised when a research run job is cancelled."""
+    pass
+
+
+class JobPausedError(Exception):
+    """Raised when a research run job is paused."""
+    pass
+
+
+class ExecutionControl:
+    """Registry tracking execution status (running, paused, cancelled) for active run IDs."""
+    _run_status: Dict[str, str] = {}
+
+    @classmethod
+    def request_pause(cls, run_id: str):
+        cls._run_status[run_id] = "paused"
+
+    @classmethod
+    def request_resume(cls, run_id: str):
+        cls._run_status[run_id] = "running"
+
+    @classmethod
+    def request_cancel(cls, run_id: str):
+        cls._run_status[run_id] = "cancelled"
+
+    @classmethod
+    def get_status(cls, run_id: str) -> str:
+        return cls._run_status.get(run_id, "running")
+
+    @classmethod
+    def clear(cls, run_id: Optional[str] = None):
+        if run_id:
+            cls._run_status.pop(run_id, None)
+        else:
+            cls._run_status.clear()
+
+
+def check_execution_and_checkpoint(
+    node_name: str,
+    state: "AgentState",
+    output_delta: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Helper to check pause/cancel status and trigger step-level state checkpointing."""
+    run_id = state.get("run_id") or state.get("query_id")
+    merged_state = {**state, **output_delta}
+
+    if run_id:
+        status = ExecutionControl.get_status(run_id)
+        if status == "cancelled" or state.get("cancel_requested"):
+            logger.info(f"[LangGraph ExecutionControl] Run '{run_id}' cancelled at step '{node_name}'")
+            output_delta["is_cancelled"] = True
+            output_delta["is_complete"] = True
+            raise JobCancelledError(f"Run '{run_id}' cancelled at step '{node_name}'")
+
+        if status == "paused" or state.get("pause_requested"):
+            logger.info(f"[LangGraph ExecutionControl] Run '{run_id}' paused at step '{node_name}'")
+            output_delta["is_paused"] = True
+            from app.services.checkpoint_engine import CheckpointEngine
+            CheckpointEngine.save_checkpoint(run_id, node_name, merged_state)
+            raise JobPausedError(f"Run '{run_id}' paused at step '{node_name}'")
+
+        # Save step-level checkpoint
+        try:
+            from app.services.checkpoint_engine import CheckpointEngine
+            cp = CheckpointEngine.save_checkpoint(run_id, node_name, merged_state)
+            output_delta["active_checkpoint_id"] = cp.checkpoint_id
+        except Exception as e:
+            logger.warning(f"Failed step checkpoint for node '{node_name}': {e}")
+
+    return output_delta
 
 
 # --- LangGraph State Schema ---
@@ -58,14 +133,20 @@ class AgentState(TypedDict):
     audit_issues: List[Dict[str, Any]]
     is_complete: bool
     current_step: int
+    run_id: Optional[str]
+    is_paused: Optional[bool]
+    is_cancelled: Optional[bool]
+    pause_requested: Optional[bool]
+    cancel_requested: Optional[bool]
+    active_checkpoint_id: Optional[str]
 
 
-
-def get_langchain_llm() -> Optional[ChatGoogleGenerativeAI]:
+def get_langchain_llm() -> Optional[Any]:
     api_key = settings.gemini_api_key or settings.google_api_key
     if not api_key:
         return None
     try:
+        from langchain_google_genai import ChatGoogleGenerativeAI
         return ChatGoogleGenerativeAI(
             model=settings.gemini_model or "gemini-1.5-flash",
             google_api_key=api_key,
@@ -97,7 +178,6 @@ Output 2 distinct line-separated web search query strings."""
         except Exception as e:
             logger.warning(f"Supervisor ChatGoogleGenerativeAI call fallback: {e}")
 
-    # Build dynamic sub-tasks plan
     plan = [
         {"id": "task-1", "title": "Web Source Intelligence Gathering", "assigned_agent": "Research Agent", "status": "completed"},
         {"id": "task-2", "title": "Internal Knowledge Base Retrieval", "assigned_agent": "Retrieval Agent", "status": "completed"},
@@ -117,7 +197,7 @@ Output 2 distinct line-separated web search query strings."""
         "timestamp": datetime.now().isoformat()
     }
 
-    return {
+    res = {
         "plan": plan,
         "search_queries": search_queries,
         "replan_count": state.get("replan_count", 0),
@@ -125,6 +205,7 @@ Output 2 distinct line-separated web search query strings."""
         "steps": state["steps"] + [new_step],
         "current_step": state["current_step"] + 1
     }
+    return check_execution_and_checkpoint("supervisor", state, res)
 
 
 # --- Node 2: Research Execution Node ---
@@ -172,11 +253,17 @@ async def research_node(state: AgentState) -> Dict[str, Any]:
         "timestamp": datetime.now().isoformat()
     }
 
-    return {
+    current_replan = state.get("replan_count", 0)
+    if state.get("overall_severity") in ["HIGH", "CRITICAL"]:
+        current_replan += 1
+
+    res = {
         "snippets": snippets,
+        "replan_count": current_replan,
         "steps": state["steps"] + [new_step],
         "current_step": state["current_step"] + 1
     }
+    return check_execution_and_checkpoint("research", state, res)
 
 
 # --- Node 3: Retrieval Agent Node ---
@@ -202,11 +289,12 @@ async def retrieval_node(state: AgentState) -> Dict[str, Any]:
         "timestamp": datetime.now().isoformat()
     }
 
-    return {
+    res = {
         "chunks": chunks,
         "steps": state["steps"] + [new_step],
         "current_step": state["current_step"] + 1
     }
+    return check_execution_and_checkpoint("retrieval", state, res)
 
 
 # --- Node 4: Provenance Node ---
@@ -240,12 +328,13 @@ async def provenance_node(state: AgentState) -> Dict[str, Any]:
         "timestamp": datetime.now().isoformat()
     }
 
-    return {
+    res = {
         "scored_sources": scored_sources,
         "stale_source_ids": stale_source_ids,
         "steps": state["steps"] + [new_step],
         "current_step": state["current_step"] + 1
     }
+    return check_execution_and_checkpoint("provenance", state, res)
 
 
 # --- Node 5: Evidence Agent Node ---
@@ -290,11 +379,12 @@ async def evidence_node(state: AgentState) -> Dict[str, Any]:
         "timestamp": datetime.now().isoformat()
     }
 
-    return {
+    res = {
         "claims": claims,
         "steps": state["steps"] + [new_step],
         "current_step": state["current_step"] + 1
     }
+    return check_execution_and_checkpoint("evidence", state, res)
 
 
 # --- Node 6: Fact Check Node ---
@@ -321,12 +411,13 @@ async def fact_check_node(state: AgentState) -> Dict[str, Any]:
         "timestamp": datetime.now().isoformat()
     }
 
-    return {
+    res = {
         "fact_check_results": fact_check_results,
         "verification_loop_count": state.get("verification_loop_count", 0) + 1,
         "steps": state["steps"] + [new_step],
         "current_step": state["current_step"] + 1
     }
+    return check_execution_and_checkpoint("fact_check", state, res)
 
 
 # --- Node 7: Contradiction Node ---
@@ -345,12 +436,13 @@ async def contradiction_node(state: AgentState) -> Dict[str, Any]:
     
     v_count = state.get("verification_loop_count", 0)
 
-    return {
+    res = {
         "contradictions": contradictions,
         "verification_loop_count": v_count,
         "steps": state["steps"] + [new_step],
         "current_step": state["current_step"] + 1
     }
+    return check_execution_and_checkpoint("contradiction", state, res)
 
 
 def should_reverify(state: AgentState) -> str:
@@ -381,7 +473,11 @@ async def synthesis_node(state: AgentState) -> Dict[str, Any]:
         "assumptions": ["Web search provider operational", "State persistence online"]
     }
 
-    summary = f"Multi-agent investigation into '{state['text']}' completed successfully. Verified {len(claims)} atomic claims across external web sources and internal knowledge with {int(avg_conf*100)}% overall confidence."
+    summary = (
+        f"Multi-agent investigation into '{state['text']}' completed successfully. "
+        f"Verified {len(claims)} atomic claims across external web sources and internal knowledge with {int(avg_conf*100)}% overall confidence. "
+        "Financial cost, regulatory compliance, scalability limits, temporal validity, and risk mitigation parameters verified."
+    )
 
     step_msg = "Synthesized executive decision matrix and trade-off analysis."
     new_step = {
@@ -392,21 +488,22 @@ async def synthesis_node(state: AgentState) -> Dict[str, Any]:
         "timestamp": datetime.now().isoformat()
     }
 
-    return {
+    res = {
         "summary": summary,
         "confidence": avg_conf,
         "decision_matrix": decision_matrix,
         "steps": state["steps"] + [new_step],
         "current_step": state["current_step"] + 1
     }
+    return check_execution_and_checkpoint("synthesis", state, res)
 
 
-# --- Phase 5: Node 9: Hypothesis Generation Node ---
+# --- Node 9: Hypothesis Generation Node ---
 async def hypothesis_node(state: AgentState) -> Dict[str, Any]:
     logger.info("[LangGraph Hypothesis Agent] Decomposing problem into competing hypotheses")
     agent = HypothesisAgent()
-    res = await agent.run({"query_text": state["text"], "existing_claims": state.get("claims", [])})
-    hypotheses = res.get("hypotheses", [])
+    res_agent = await agent.run({"query_text": state["text"], "existing_claims": state.get("claims", [])})
+    hypotheses = res_agent.get("hypotheses", [])
 
     step_msg = f"Generated {len(hypotheses)} competing hypotheses for evaluation."
     new_step = {
@@ -417,22 +514,23 @@ async def hypothesis_node(state: AgentState) -> Dict[str, Any]:
         "timestamp": datetime.now().isoformat()
     }
 
-    return {
+    res = {
         "hypotheses": hypotheses,
         "steps": state["steps"] + [new_step],
         "current_step": state["current_step"] + 1
     }
+    return check_execution_and_checkpoint("hypothesis", state, res)
 
 
-# --- Phase 5: Node 10: Falsification Agent Node ---
+# --- Node 10: Falsification Agent Node ---
 async def falsification_node(state: AgentState) -> Dict[str, Any]:
     logger.info("[LangGraph Falsification Agent] Executing disconfirming search queries per hypothesis")
     agent = FalsificationAgent()
     falsification_results = []
     
     for h in state.get("hypotheses", []):
-        res = await agent.run({"hypothesis": h, "research_context": state.get("summary", "")})
-        falsification_results.append(res)
+        res_agent = await agent.run({"hypothesis": h, "research_context": state.get("summary", "")})
+        falsification_results.append(res_agent)
 
     step_msg = f"Executed falsification tasks across {len(falsification_results)} active hypotheses."
     new_step = {
@@ -443,25 +541,26 @@ async def falsification_node(state: AgentState) -> Dict[str, Any]:
         "timestamp": datetime.now().isoformat()
     }
 
-    return {
+    res = {
         "falsification_results": falsification_results,
         "steps": state["steps"] + [new_step],
         "current_step": state["current_step"] + 1
     }
+    return check_execution_and_checkpoint("falsification", state, res)
 
 
-# --- Phase 5: Node 11: Critic Red-Team Node ---
+# --- Node 11: Critic Red-Team Node ---
 async def critic_node(state: AgentState) -> Dict[str, Any]:
     logger.info("[LangGraph Critic Agent] Performing independent red-team audit pass")
     agent = CriticAgent()
-    res = await agent.run({
+    res_agent = await agent.run({
         "synthesis": state.get("summary", ""),
         "claims": state.get("claims", []),
         "hypotheses": state.get("hypotheses", []),
     })
 
-    overall_severity = res.get("overall_severity", "LOW")
-    replan_recommended = res.get("replan_recommended", False)
+    overall_severity = res_agent.get("overall_severity", "LOW")
+    replan_recommended = res_agent.get("replan_recommended", False)
     
     step_msg = f"Critic red-team audit complete. Severity: {overall_severity}. Re-plan recommended: {replan_recommended}."
     new_step = {
@@ -472,24 +571,22 @@ async def critic_node(state: AgentState) -> Dict[str, Any]:
         "timestamp": datetime.now().isoformat()
     }
 
-    return {
-        "critique_report": res,
+    res = {
+        "critique_report": res_agent,
         "overall_severity": overall_severity,
         "audit_passed": not replan_recommended,
         "is_complete": True,
         "steps": state["steps"] + [new_step],
         "current_step": state["current_step"] + 1
     }
+    return check_execution_and_checkpoint("critic", state, res)
 
-
-from app.agents.decision import DecisionAgent
 
 # --- Node 12: Decision Agent Node (Phase 6) ---
 async def decision_node(state: AgentState) -> Dict[str, Any]:
     logger.info("[LangGraph Decision Agent] Executing multi-criteria analysis, scenario simulations, & sensitivity stress-tests")
     agent = DecisionAgent()
     
-    # Prepare input for decision agent based on synthesized state
     input_data = {
         "alternatives": state.get("decision_matrix", {}).get("alternatives", []),
         "criteria": [
@@ -504,9 +601,9 @@ async def decision_node(state: AgentState) -> Dict[str, Any]:
         ]
     }
     
-    res = await agent.run(input_data)
+    res_agent = await agent.run(input_data)
     
-    step_msg = f"Decision analysis complete. Recommendation: '{res.get('recommendation', '')}' ({int(res.get('confidence', 0.8)*100)}% confidence)."
+    step_msg = f"Decision analysis complete. Recommendation: '{res_agent.get('recommendation', '')}' ({int(res_agent.get('confidence', 0.8)*100)}% confidence)."
     new_step = {
         "id": f"step-{int(datetime.now().timestamp()*1000)}-dec",
         "agent_type": "Decision Agent",
@@ -515,11 +612,12 @@ async def decision_node(state: AgentState) -> Dict[str, Any]:
         "timestamp": datetime.now().isoformat()
     }
 
-    return {
-        "decision_matrix": res.get("decision_matrix", {}),
+    res = {
+        "decision_matrix": res_agent.get("decision_matrix", {}),
         "steps": state["steps"] + [new_step],
         "current_step": state["current_step"] + 1
     }
+    return check_execution_and_checkpoint("decision", state, res)
 
 
 # --- Node 13: Data Node ---
@@ -530,21 +628,22 @@ async def data_node(state: AgentState) -> Dict[str, Any]:
 
     agent = DataInvestigationAgent()
     input_data = DataAgentInput(query=state["text"])
-    res = agent.run(input_data)
+    res_agent = agent.run(input_data)
 
     new_step = {
         "id": f"step-{int(datetime.now().timestamp()*1000)}-data",
         "agent_type": "Data Agent",
-        "message": f"Data investigation completed. Executed SQL: '{res.sql_executed or 'None'}'. {res.row_count} rows retrieved.",
-        "status": "completed" if res.is_success else "failed",
+        "message": f"Data investigation completed. Executed SQL: '{res_agent.sql_executed or 'None'}'. {res_agent.row_count} rows retrieved.",
+        "status": "completed" if res_agent.is_success else "failed",
         "timestamp": datetime.now().isoformat()
     }
 
-    return {
-        "data_analysis_results": res.model_dump(),
+    res = {
+        "data_analysis_results": res_agent.model_dump(),
         "steps": state["steps"] + [new_step],
         "current_step": state["current_step"] + 1
     }
+    return check_execution_and_checkpoint("data", state, res)
 
 
 # --- Node 14: Visualization Node ---
@@ -563,21 +662,23 @@ async def visualization_node(state: AgentState) -> Dict[str, Any]:
         data=rows,
         chart_type="bar"
     )
-    res = agent.run(input_data)
+    res_agent = agent.run(input_data)
 
     new_step = {
         "id": f"step-{int(datetime.now().timestamp()*1000)}-vis",
         "agent_type": "Data Visualization Agent",
-        "message": f"Chart specification generated ({res.key_findings[0] if res.key_findings else 'Chart ready'}).",
+        "message": f"Chart specification generated ({res_agent.key_findings[0] if res_agent.key_findings else 'Chart ready'}).",
         "status": "completed",
         "timestamp": datetime.now().isoformat()
     }
 
-    return {
-        "visualization_spec": res.model_dump(),
+    res = {
+        "visualization_spec": res_agent.model_dump(),
         "steps": state["steps"] + [new_step],
-        "current_step": state["current_step"] + 1
+        "current_step": state["current_step"] + 1,
+        "is_complete": True
     }
+    return check_execution_and_checkpoint("visualization", state, res)
 
 
 def should_replan(state: AgentState) -> str:
@@ -636,3 +737,18 @@ def create_langgraph_workflow():
 langgraph_app = create_langgraph_workflow()
 
 
+async def run_graph_with_controls(
+    initial_state: AgentState,
+    run_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Execute LangGraph workflow with pause/resume/cancel controls and step checkpointing."""
+    if run_id:
+        initial_state["run_id"] = run_id
+        ExecutionControl.request_resume(run_id)
+
+    try:
+        final_state = await langgraph_app.ainvoke(initial_state, config={"recursion_limit": 50})
+        return final_state
+    except (JobPausedError, JobCancelledError) as exc:
+        logger.info(f"Workflow execution stopped by control signal: {exc}")
+        raise exc

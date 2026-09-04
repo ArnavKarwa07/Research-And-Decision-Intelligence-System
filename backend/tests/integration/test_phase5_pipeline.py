@@ -51,11 +51,12 @@ async def test_phase5_pipeline_full_execution():
         "current_step": 0
     }
 
-    final_state = None
+    merged_state = dict(initial_state)
     async for output in workflow.astream(initial_state):
         for node_name, state in output.items():
-            final_state = state
+            merged_state.update(state)
 
+    final_state = merged_state
     assert final_state is not None
     assert final_state.get("is_complete") is True
     assert "hypotheses" in final_state

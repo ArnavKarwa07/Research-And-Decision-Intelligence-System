@@ -46,6 +46,7 @@ class SelfChallengeService:
                 return [
                     {
                         "id": str(h.id),
+                        "query_id": str(h.query_id) if h.query_id else str(query_id),
                         "statement": h.statement,
                         "status": h.status,
                         "confidence": h.confidence,
@@ -54,6 +55,8 @@ class SelfChallengeService:
                         "evidence_map": h.evidence_map or [],
                         "falsification_attempts": h.falsification_attempts,
                         "max_falsification_attempts": h.max_falsification_attempts,
+                        "created_at": h.created_at or datetime.now(),
+                        "updated_at": h.updated_at or datetime.now(),
                     }
                     for h in existing
                 ]
@@ -66,10 +69,12 @@ class SelfChallengeService:
         ]
 
         generated_hypotheses = []
+        now_dt = datetime.now()
         for idx, stmt in enumerate(statements):
             hyp_id = str(uuid.uuid4())
             hyp_dict = {
                 "id": hyp_id,
+                "query_id": str(query_id),
                 "statement": stmt,
                 "status": "proposed",
                 "confidence": 0.5,
@@ -78,6 +83,8 @@ class SelfChallengeService:
                 "evidence_map": [],
                 "falsification_attempts": 0,
                 "max_falsification_attempts": settings.max_falsification_attempts,
+                "created_at": now_dt,
+                "updated_at": now_dt,
             }
             generated_hypotheses.append(hyp_dict)
 

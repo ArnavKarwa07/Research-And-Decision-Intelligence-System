@@ -73,7 +73,7 @@ class QueryService:
                 final_state = initial_state
                 
                 # Stream LangGraph state updates node-by-node
-                async for output in langgraph_app.astream(initial_state):
+                async for output in langgraph_app.astream(initial_state, config={"recursion_limit": 50}):
                     for node_name, node_state in output.items():
                         logger.info(f"[LangGraph Stream] Node completed: '{node_name}'")
                         final_state.update(node_state)

@@ -379,6 +379,69 @@ Permissions are evaluated dynamically at runtime using `SecurityService.check_to
 - **`GatekeeperAgent` (`app/agents/gatekeeper_agent.py`)**: Subclass of `BaseAgent`. Evaluates task ambiguity, raises clarification questions, and checks tool permission gates.
 - **`SafetyAgent` (`app/agents/safety_agent.py`)**: Subclass of `BaseAgent`. Executes multi-layer safety scans (permissions, PII redaction, prompt injection defense, audit logging) across agent inputs and outputs.
 
+## Phase 9 Production Agent Runtime Architecture
+
+Phase 9 introduces the Production Agent Runtime providing high-throughput async background worker management, state checkpointing and restoration, multi-dimension budget enforcement, and real-time SSE cost telemetry.
+
+```mermaid
+flowchart TD
+    A["API Request / Job Submission"] --> B["JobQueueManager (Priority Queue 1-5)"]
+    B --> C["AsyncWorkerPool (max_concurrency Workers)"]
+    C --> D["LangGraph Agent Node Execution"]
+    D -->|"At each step boundary"| E["CheckpointEngine (State Snapshot)"]
+    E -->|"Persists DB execution_log & Memory"| F["AgentRun DB Record"]
+    D -->|"Enforces Token/Search/Tool/WallClock"| G["BudgetService & CompositeBudget"]
+    G -->|"Hard Limit Exceeded"| H["BudgetExceededError (Halt & Persist)"]
+    G -->|"Soft Limit Warning (80%)"| I["SSE Telemetry Stream"]
+    D -->|"LLM & Tool Call Cost Estimation"| J["CostTelemetryTracker"]
+    J -->|"Live SSE Events"| K["telemetry:cost_updated SSE"]
+```
+
+### 1. Async Worker Pool & Background Job Queue Configuration
+
+- **`JobQueueManager` (`app/services/worker_pool.py`)**:
+  - Utilizes `asyncio.PriorityQueue` wrapped with `PriorityJobWrapper` sorting jobs by priority integer ($1$ is highest priority, $5$ is default) and creation timestamp.
+  - Job status state machine: `queued` $\rightarrow$ `running` $\rightarrow$ `completed` / `failed` / `paused` / `cancelled` / `recovering`.
+  - Automatic retry handler: retries failed tasks up to `max_retries` (default $3$) before transitioning to `failed` status.
+- **`AsyncWorkerPool` (`app/services/worker_pool.py`)**:
+  - Manages background worker task loops (`_worker_loop`) up to `max_concurrency` (default $4$).
+  - Workers pull jobs asynchronously from `JobQueueManager`, track task heartbeats (`heartbeat_at`), handle cancellation signals (`asyncio.CancelledError`), and dispatch execution handlers registered via `register_handler(task_type, handler)`.
+  - Global singleton instance: `global_worker_pool`.
+
+### 2. Step Checkpointing Engine & State Resumption APIs
+
+- **`CheckpointEngine` (`app/services/checkpoint_engine.py`)**:
+  - Captures step-level snapshots of `AgentState`, extracted claims, scored sources, and agent outputs (`decision_matrix`, `data_analysis_results`, `visualization_spec`, `critique_report`, `hypotheses`).
+  - Serializes datetime, UUID, set, and Pydantic types via `custom_json_serializer`.
+  - Stores checkpoints in memory (`_checkpoints[run_id]`) and synchronizes with SQLAlchemy DB (`AgentRun.execution_log["checkpoints"]`).
+- **State Resumption Workflow (`resume_run_from_checkpoint`)**:
+  - Deserializes state snapshot from `checkpoint_id`, `step_name`, or latest checkpoint.
+  - Reconstructs full typed `AgentState` dictionary ensuring seamless graph execution resumption without re-running earlier steps.
+
+### 3. Multi-Dimension Budget Service Integration
+
+- **`BudgetService` & `CompositeBudget` (`app/services/budget_service.py`)**:
+  - Tracks usage across 4 distinct dimensions:
+    1. `TokenBudget`: Prompt tokens, completion tokens, total tokens vs `max_tokens` (default $100,000$).
+    2. `SearchBudget`: Web and database queries vs `max_searches` (default $20$).
+    3. `ToolBudget`: Aggregate tool executions vs `max_tool_calls` (default $50$).
+    4. `WallClockBudget`: Execution duration vs `max_seconds` (default $300.0$s / 5 minutes).
+  - Enforces hard limits by raising `BudgetExceededError` and soft limits by emitting warning messages at $80\%$ utilization threshold.
+  - Bounded sub-task budgets (`create_sub_task_budget`) ensuring sub-workstreams cannot exceed parent run remaining capacity.
+  - Global singleton instance: `budget_service`.
+
+### 4. Real-Time SSE Cost Telemetry Service
+
+- **`CostTelemetryTracker` (`app/services/cost_telemetry.py`)**:
+  - Calculates estimated USD costs per LLM call (`estimate_llm_cost`) based on model pricing (GPT-4o, Claude 3.5 Sonnet, Gemini 1.5 Pro/Flash) per 1,000 tokens.
+  - Calculates tool call costs (`estimate_tool_cost`) per execution (`web_search`, `python_sandbox`, `fact_checker`).
+  - Streams real-time SSE cost events over `stream_service`:
+    - `telemetry:cost_updated`: Incremental cost and running total metrics.
+    - `telemetry:budget_updated`: General budget usage update.
+    - `telemetry:budget_warning`: Soft budget limit warning.
+    - `telemetry:budget_exceeded`: Hard budget limit error.
+  - Global singleton instance: `cost_telemetry_tracker`.
+
 ## Testing & Audit Commands
 
 **Backend:**

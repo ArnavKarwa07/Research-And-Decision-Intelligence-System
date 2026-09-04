@@ -16,6 +16,7 @@ from app.api.v1 import (
     data_analysis,
     hitl,
     safety,
+    runtime,
 )
 
 
@@ -37,6 +38,8 @@ api_v1_router.include_router(decisions.router)
 api_v1_router.include_router(data_analysis.router)
 api_v1_router.include_router(hitl.router)
 api_v1_router.include_router(safety.router)
+api_v1_router.include_router(runtime.router)
+
 
 
 

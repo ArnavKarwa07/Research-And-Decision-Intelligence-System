@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import get_db
 from app.models.query import Query
-from app.schemas.hypothesis import CritiqueReportResponse
+from app.schemas.hypothesis import CritiqueReportResponse, CritiqueReportListResponse
 
 from app.services.critique_service import CritiqueService
 
@@ -29,7 +29,7 @@ async def run_critique(
         raise HTTPException(status_code=500, detail=f"Failed to run critique: {str(e)}")
 
 
-@router.get("/queries/{query_id}/critique", response_model=List[CritiqueReportResponse])
+@router.get("/queries/{query_id}/critique", response_model=CritiqueReportListResponse)
 async def get_critiques(
     query_id: UUID,
     db: AsyncSession = Depends(get_db)
@@ -48,6 +48,4 @@ async def get_critiques(
     reports = critique_service.get_critiques_by_query(db, query_id)
     if hasattr(reports, "__await__"):
         reports = await reports
-    return reports
-
-
+    return {"reports": reports, "total": len(reports)}

@@ -4,7 +4,7 @@ from enum import Enum
 from typing import Any, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 
 
 class HypothesisStatus(str, Enum):
@@ -108,7 +108,7 @@ class HypothesisResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
     id: UUID
-    query_id: UUID
+    query_id: Optional[UUID] = None
     statement: str
     status: HypothesisStatus
     confidence: float
@@ -118,8 +118,15 @@ class HypothesisResponse(BaseModel):
     falsification_attempts: int = 0
     max_falsification_attempts: int = 5
     metadata_: Optional[dict[str, Any]] = Field(default=None, alias="metadata")
-    created_at: datetime
-    updated_at: datetime
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    @field_validator("metadata_", mode="before")
+    @classmethod
+    def _validate_metadata(cls, v: Any) -> Any:
+        if not isinstance(v, dict):
+            return None
+        return v
 
 
 class HypothesisListResponse(BaseModel):
@@ -171,7 +178,7 @@ class CritiqueReportListResponse(BaseModel):
 class SelfChallengeRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    query_id: UUID
+    query_id: Optional[UUID] = None
     max_iterations: int = Field(default=3, ge=1, le=10, alias="max_replan_iterations")
     confidence_threshold: float = Field(default=0.3, ge=0.0, le=1.0)
 

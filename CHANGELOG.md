@@ -5,6 +5,19 @@ All notable changes to the Research And Decision Intelligence System (RADIS) wil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [9.0.0] - Phase 9 Release - 2026-09-04
+
+### Added (Phase 9 Production Agent Runtime)
+- **Async Worker Pool & Priority Queue (`AsyncWorkerPool`, `JobQueueManager`)**: Background worker pool managing concurrent research job execution with configurable concurrency limits (`max_concurrency`), 5-level priority queue ordering (`PriorityJobWrapper`), worker loop lifecycle management (`start`, `stop`), automatic retries, heartbeat tracking, and job status state machine (`queued`, `running`, `completed`, `failed`, `paused`, `cancelled`, `recovering`).
+- **Step-Level Checkpoint Engine (`CheckpointEngine`, `Checkpoint`)**: In-memory and persistent step-level state checkpointing engine capturing graph execution state snapshots (`AgentState`), extracted claims, scored sources, and agent outputs (`decision_matrix`, `data_analysis_results`, `visualization_spec`, `critique_report`, `hypotheses`). Includes `resume_run_from_checkpoint` for state deserialization and resumption.
+- **Multi-Dimension Budget Enforcement (`BudgetService`, `CompositeBudget`)**: Real-time budget enforcement across 4 distinct dimensions: `TokenBudget` (prompt/completion tokens), `SearchBudget` (web and DB queries), `ToolBudget` (aggregate tool executions), and `WallClockBudget` (elapsed runtime seconds). Supports configurable soft limits (80% warning threshold) and hard limits (`BudgetExceededError`), along with sub-task budget allocation bounded by parent run capacity.
+- **Real-Time SSE Cost Telemetry (`CostTelemetryTracker`, `estimate_llm_cost`, `estimate_tool_cost`)**: Real-time USD cost estimation engine for LLM model calls (GPT-4o, Claude 3.5 Sonnet, Gemini 1.5 Pro/Flash) and tool executions (`web_search`, `python_sandbox`, `fact_checker`). Emits real-time SSE cost telemetry events: `telemetry:cost_updated`, `telemetry:budget_updated`, `telemetry:budget_warning`, and `telemetry:budget_exceeded`.
+- **Runtime Control REST APIs**: 4 new execution control endpoints available under both `/api/v1/runtime/runs` and `/api/runs` direct path aliases:
+  - `POST /api/v1/runtime/runs/{id}/pause` (and `/api/runs/{id}/pause`): Pause an active research run.
+  - `POST /api/v1/runtime/runs/{id}/resume` (and `/api/runs/{id}/resume`): Resume a paused or failed research run from the latest checkpoint.
+  - `GET /api/v1/runtime/runs/{id}/checkpoints` (and `/api/runs/{id}/checkpoints`): Retrieve all step-level execution checkpoints for a run.
+  - `GET /api/v1/runtime/runs/{id}/budget` (and `/api/runs/{id}/budget`): Retrieve multi-dimension budget tracking statistics and limit check status for a run.
+
 ## [8.0.0] - Phase 8 Release - 2026-09-04
 
 ### Added (Phase 8 Human-in-the-Loop & Safety Framework)
