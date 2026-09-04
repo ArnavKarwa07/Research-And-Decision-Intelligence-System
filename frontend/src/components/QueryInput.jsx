@@ -1,14 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 
-export default function QueryInput({ onSubmit, isLoading, disabled }) {
+export default function QueryInput({ onSubmit, isLoading, disabled, onUploadDocument, onAddFact }) {
   const [text, setText] = useState('');
   const [mode, setMode] = useState('deep');
+  const [showPlusMenu, setShowPlusMenu] = useState(false);
+  const [showFactInput, setShowFactInput] = useState(false);
+  const [factText, setFactText] = useState('');
+
+  const fileInputRef = useRef(null);
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!text.trim() || isLoading || disabled) return;
     onSubmit(text.trim(), mode);
     setText('');
+    setShowPlusMenu(false);
   };
 
   const handleKeyDown = (e) => {
@@ -18,44 +24,158 @@ export default function QueryInput({ onSubmit, isLoading, disabled }) {
     }
   };
 
+  const handleFileChange = (e) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      if (onUploadDocument) onUploadDocument(files[0]);
+      setShowPlusMenu(false);
+    }
+  };
+
+  const handleFactSubmit = (e) => {
+    e.preventDefault();
+    if (factText.trim() && onAddFact) {
+      onAddFact(factText.trim());
+      setFactText('');
+      setShowFactInput(false);
+      setShowPlusMenu(false);
+    }
+  };
+
   return (
     <form
       onSubmit={handleSubmit}
       className="fixed bottom-6 left-[calc(50%+130px)] -translate-x-1/2 w-full max-w-4xl z-50 px-4 box-border"
     >
-      <div className="bg-surface-container-low/95 border border-outline-variant rounded-2xl shadow-2xl backdrop-blur-md p-3.5 flex flex-col gap-2.5">
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        className="hidden"
+        accept=".pdf,.docx,.csv,.xlsx,.txt"
+      />
+
+      <div className="bg-surface-container-low/95 border border-outline-variant rounded-2xl shadow-2xl backdrop-blur-md p-3.5 flex flex-col gap-2.5 relative">
         
-        {/* Mode Selector Pill Buttons */}
-        <div className="flex items-center gap-2 font-mono text-xs">
-          <span className="text-[10px] font-bold text-outline uppercase tracking-wider mr-1">
-            Mode:
-          </span>
-          {[
-            { id: 'deep', label: 'Deep Research', icon: 'microscope' },
-            { id: 'adversarial', label: 'Adversarial Audit', icon: 'shield' },
-            { id: 'data_analyst', label: 'Data Analyst', icon: 'analytics' },
-            { id: 'quick', label: 'Quick Answer', icon: 'bolt' },
-          ].map((m) => {
-            const isActive = mode === m.id;
-            return (
+        {/* Plus Action Popover Menu */}
+        {showPlusMenu && (
+          <div className="absolute bottom-full mb-3 left-4 bg-surface-container-high border border-outline-variant rounded-xl p-2 shadow-2xl z-50 flex flex-col gap-1 w-64 text-xs font-mono">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-surface-container text-on-surface hover:text-primary transition-all text-left cursor-pointer font-bold"
+            >
+              <span className="material-symbols-outlined text-base text-primary">cloud_upload</span>
+              <span>Upload Document (RAG)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowFactInput(!showFactInput)}
+              className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-surface-container text-on-surface hover:text-primary transition-all text-left cursor-pointer font-bold"
+            >
+              <span className="material-symbols-outlined text-base text-primary">psychology</span>
+              <span>Add Project Fact</span>
+            </button>
+
+            <div className="border-t border-outline-variant/60 my-1 pt-1 text-[10px] text-outline px-3 uppercase tracking-wider font-bold">
+              Research Mode
+            </div>
+
+            {[
+              { id: 'deep', label: 'Deep Research', icon: 'search' },
+              { id: 'adversarial', label: 'Adversarial Audit', icon: 'shield' },
+              { id: 'data_analyst', label: 'Data Analyst', icon: 'analytics' },
+              { id: 'quick', label: 'Quick Answer', icon: 'bolt' },
+            ].map((m) => (
               <button
                 key={m.id}
                 type="button"
-                onClick={() => setMode(m.id)}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
-                  isActive
-                    ? 'bg-primary/20 text-primary border border-primary/50 shadow-sm font-bold'
-                    : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container/50 border border-transparent'
+                onClick={() => {
+                  setMode(m.id);
+                  setShowPlusMenu(false);
+                }}
+                className={`flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer ${
+                  mode === m.id ? 'bg-primary/20 text-primary font-bold' : 'text-on-surface-variant hover:text-on-surface'
                 }`}
               >
-                <span className="material-symbols-outlined text-xs">{m.icon}</span>
-                <span>{m.label}</span>
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-xs">{m.icon}</span>
+                  <span>{m.label}</span>
+                </div>
+                {mode === m.id && <span className="material-symbols-outlined text-xs">check</span>}
               </button>
-            );
-          })}
+            ))}
+          </div>
+        )}
+
+        {/* Quick Fact Popover Form */}
+        {showFactInput && (
+          <div className="p-3 bg-surface-container rounded-xl border border-primary/40 flex gap-2 text-xs">
+            <input
+              type="text"
+              value={factText}
+              onChange={(e) => setFactText(e.target.value)}
+              placeholder="Enter durable project fact or assumption..."
+              className="flex-1 px-3 py-1.5 bg-surface-container-low border border-outline-variant rounded-lg text-on-surface text-xs outline-none focus:border-primary font-body-main"
+            />
+            <button
+              type="button"
+              onClick={handleFactSubmit}
+              className="px-3 py-1.5 bg-primary text-on-primary font-bold rounded-lg cursor-pointer"
+            >
+              Add
+            </button>
+          </div>
+        )}
+
+        {/* Top Dock Header: Plus Button & Mode Selector Pills */}
+        <div className="flex items-center justify-between font-mono text-xs">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowPlusMenu(!showPlusMenu)}
+              className={`w-7 h-7 rounded-full flex items-center justify-center transition-all cursor-pointer border ${
+                showPlusMenu
+                  ? 'bg-primary text-on-primary border-primary rotate-45'
+                  : 'bg-surface-container border-outline-variant text-on-surface hover:text-primary hover:border-primary/50'
+              }`}
+              title="Upload data, add facts, or change options"
+            >
+              <span className="material-symbols-outlined text-base">add</span>
+            </button>
+
+            <span className="text-[10px] font-bold text-outline uppercase tracking-wider ml-1">
+              Mode:
+            </span>
+
+            {[
+              { id: 'deep', label: 'Deep Research', icon: 'search' },
+              { id: 'adversarial', label: 'Adversarial Audit', icon: 'shield' },
+              { id: 'data_analyst', label: 'Data Analyst', icon: 'analytics' },
+              { id: 'quick', label: 'Quick Answer', icon: 'bolt' },
+            ].map((m) => {
+              const isActive = mode === m.id;
+              return (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => setMode(m.id)}
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                    isActive
+                      ? 'bg-primary/20 text-primary border border-primary/50 shadow-sm font-bold'
+                      : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container/50 border border-transparent'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-xs">{m.icon}</span>
+                  <span>{m.label}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
-        {/* Input Textarea & Send CTA */}
+        {/* Input Textarea & Icon-Only Submit CTA (No 'Send' Text) */}
         <div className="flex items-end gap-3">
           <textarea
             value={text}
@@ -74,15 +194,13 @@ export default function QueryInput({ onSubmit, isLoading, disabled }) {
           <button
             type="submit"
             disabled={!text.trim() || isLoading || disabled}
-            className="px-5 py-2.5 bg-primary/20 text-primary border border-primary/40 rounded-xl text-xs font-bold hover:bg-primary/30 active:scale-95 transition-all cursor-pointer flex items-center gap-1.5 flex-shrink-0 disabled:opacity-40 disabled:cursor-not-allowed shadow-md"
+            className="w-10 h-10 rounded-full bg-primary text-on-primary border border-primary/40 flex items-center justify-center hover:bg-primary-container active:scale-95 transition-all cursor-pointer flex-shrink-0 disabled:opacity-40 disabled:cursor-not-allowed shadow-md"
+            title="Submit Query"
           >
             {isLoading ? (
-              <span>Running...</span>
+              <span className="w-4 h-4 border-2 border-on-primary border-t-transparent rounded-full animate-spin" />
             ) : (
-              <>
-                <span>Send</span>
-                <span className="material-symbols-outlined text-sm">send</span>
-              </>
+              <span className="material-symbols-outlined text-lg">arrow_upward</span>
             )}
           </button>
         </div>

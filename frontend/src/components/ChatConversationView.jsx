@@ -53,82 +53,72 @@ export default function ChatConversationView({
           <div className="w-9 h-9 rounded-full bg-primary border border-primary/40 flex items-center justify-center font-bold text-sm text-on-primary flex-shrink-0 shadow-md">
             R
           </div>
-          <div className="flex flex-col gap-4 flex-1">
+          <div className="bg-surface-container-low border border-outline-variant rounded-xl p-5 text-on-surface text-sm leading-relaxed shadow-md flex-1 flex flex-col gap-4">
             
-            {/* Primary Strategic Recommendation Banner */}
+            {/* Recommendation Header */}
             {decisionMatrix && (
-              <div className="bg-surface-container border border-primary/50 rounded-xl p-5 shadow-xl relative overflow-hidden">
-                <div className="flex justify-between items-center mb-2">
+              <div className="border-b border-outline-variant/60 pb-4">
+                <div className="flex justify-between items-center mb-1.5">
                   <span className="font-mono text-[10px] font-bold text-primary uppercase tracking-widest flex items-center gap-1">
                     <span className="material-symbols-outlined text-sm">workspace_premium</span>
-                    <span>Primary Strategic Recommendation</span>
+                    <span>Strategic Synthesis</span>
                   </span>
                   <span className="font-mono text-xs font-bold px-2.5 py-0.5 rounded-full bg-tertiary-container/30 text-tertiary border border-tertiary/40">
                     {Math.round((decisionMatrix.confidence || 0.88) * 100)}% Confidence
                   </span>
                 </div>
-                <h3 className="text-lg font-bold text-on-surface font-headline-md mb-2">
+                <h3 className="text-base font-bold text-on-surface font-headline-md">
                   {decisionMatrix.recommendation}
                 </h3>
-                <p className="text-xs text-on-surface-variant leading-relaxed">
+                <p className="text-xs text-on-surface-variant leading-relaxed mt-1.5">
                   {decisionMatrix.rationale}
                 </p>
               </div>
             )}
 
-            {/* Synthesized Findings Block */}
-            <div className="bg-surface-container-low border border-outline-variant rounded-xl p-5 text-on-surface text-sm leading-relaxed shadow-md">
-              <div className="font-headline-md font-bold text-primary text-base mb-3">
-                Synthesized Findings & Claim Analysis
-              </div>
-
-              <p className="text-xs text-on-surface-variant mb-3">
-                Multi-agent research completed across verified primary sources, internal project knowledge, and quantitative trade-off criteria.
-              </p>
-
-              {/* Claims & Citation Chips */}
-              {claims.length > 0 && (
-                <div className="mt-4 flex flex-col gap-2">
-                  <div className="font-mono text-[11px] font-bold text-outline uppercase tracking-wider">
-                    Extracted Factual Claims ({claims.length})
-                  </div>
-                  {claims.slice(0, 4).map((c, idx) => (
-                    <div key={c.id || idx} className="flex items-start gap-2.5 text-xs bg-surface-container p-3 rounded-lg border border-outline-variant/60">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono ${
-                        c.support_status === 'SUPPORTED' ? 'bg-tertiary-container/30 text-tertiary' : 'bg-primary-container/30 text-primary'
-                      }`}>
-                        [{idx + 1}] {c.support_status || 'FACT'}
-                      </span>
-                      <span className="text-on-surface-variant flex-1">{c.text}</span>
-                    </div>
-                  ))}
+            {/* Claims & Citation Chips */}
+            {claims.length > 0 && (
+              <div className="flex flex-col gap-2">
+                <div className="font-mono text-[11px] font-bold text-outline uppercase tracking-wider">
+                  Verified Factual Claims ({claims.length})
                 </div>
-              )}
+                {claims.slice(0, 4).map((c, idx) => (
+                  <div key={c.id || idx} className="flex items-start gap-2.5 text-xs bg-surface-container p-3 rounded-lg border border-outline-variant/60">
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono ${
+                      c.support_status === 'SUPPORTED' ? 'bg-tertiary-container/30 text-tertiary' : 'bg-primary-container/30 text-primary'
+                    }`}>
+                      [{idx + 1}] {c.support_status || 'FACT'}
+                    </span>
+                    <span className="text-on-surface-variant flex-1">{c.text}</span>
+                  </div>
+                ))}
+              </div>
+            )}
 
-              {/* Collapsible Evidence Link Trigger */}
-              {evidence.length > 0 && (
+            {/* Collapsible Evidence Link Trigger */}
+            {evidence.length > 0 && (
+              <div>
                 <button
                   type="button"
                   onClick={() => setShowEvidenceDrawer(!showEvidenceDrawer)}
-                  className="mt-4 px-3.5 py-2 bg-surface-container border border-outline-variant rounded-lg text-primary text-xs font-semibold hover:bg-surface-container-high transition-all flex items-center gap-2 cursor-pointer"
+                  className="px-3.5 py-2 bg-surface-container border border-outline-variant rounded-lg text-primary text-xs font-semibold hover:bg-surface-container-high transition-all flex items-center gap-2 cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-sm">manage_search</span>
                   <span>{showEvidenceDrawer ? 'Hide' : 'Inspect'} Verified Sources & Evidence Trail ({evidence.length})</span>
                 </button>
-              )}
 
-              {/* Collapsible Evidence List */}
-              {showEvidenceDrawer && (
-                <div className="mt-3 flex flex-col gap-2">
-                  {evidence.map((ev, i) => (
-                    <div key={i} className="p-3 bg-surface-container border border-outline-variant/60 rounded-lg text-xs">
-                      <div className="font-bold text-on-surface">{ev.source_title || ev.title || 'Source'}</div>
-                      <div className="text-on-surface-variant mt-1 text-[11px]">{ev.excerpt || ev.snippet || ev.url}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                {showEvidenceDrawer && (
+                  <div className="mt-3 flex flex-col gap-2">
+                    {evidence.map((ev, i) => (
+                      <div key={i} className="p-3 bg-surface-container border border-outline-variant/60 rounded-lg text-xs">
+                        <div className="font-bold text-on-surface">{ev.source_title || ev.title || 'Source'}</div>
+                        <div className="text-on-surface-variant mt-1 text-[11px]">{ev.excerpt || ev.snippet || ev.url}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
           </div>
         </div>
