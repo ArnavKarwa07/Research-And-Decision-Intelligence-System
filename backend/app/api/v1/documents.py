@@ -92,19 +92,15 @@ async def stream_document_status(
 
     async def sse_generator():
         try:
-            while True:
-                if await request.is_disconnected():
+            async for event in event_generator:
+                yield {
+                    "event": event.event_type,
+                    "data": event.model_dump_json(),
+                }
+                if event.event_type in ("complete", "error"):
                     break
-                try:
-                    event = await asyncio.wait_for(anext(event_generator), timeout=1.0)
-                    yield {
-                        "event": event.event_type,
-                        "data": event.model_dump_json(),
-                    }
-                except StopAsyncIteration:
-                    break
-                except asyncio.TimeoutError:
-                    continue
+        except (asyncio.CancelledError, Exception):
+            pass
         finally:
             stream_service.unsubscribe(target_doc_id, subscriber_id)
 

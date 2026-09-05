@@ -44,8 +44,11 @@ class StreamService:
         async def event_generator() -> AsyncGenerator[StreamEvent, None]:
             try:
                 while True:
-                    event = await queue.get()
-                    yield event
+                    try:
+                        event = await asyncio.wait_for(queue.get(), timeout=1.0)
+                        yield event
+                    except asyncio.TimeoutError:
+                        yield StreamEvent(event_type="ping", data={}, timestamp=datetime.now())
             finally:
                 self.unsubscribe(query_id, subscriber_id)
                 

@@ -1,4 +1,4 @@
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api/v1';
 
 async function fetchApi(endpoint, options = {}) {
   const url = `${BASE_URL}${endpoint}`;
@@ -13,6 +13,10 @@ async function fetchApi(endpoint, options = {}) {
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({ detail: response.statusText }));
     throw new Error(errorData.detail || `API Error: ${response.status}`);
+  }
+
+  if (response.status === 204) {
+    return null;
   }
 
   return response.json();
@@ -30,8 +34,18 @@ export const api = {
 
   getSession: (id) => fetchApi(`/sessions/${id}`),
 
+  updateSession: (id, data) =>
+    fetchApi(`/sessions/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  deleteSession: (id) => fetchApi(`/sessions/${id}`, { method: 'DELETE' }),
+
+  getSessionQueries: (sessionId) => fetchApi(`/sessions/${sessionId}/queries`),
+
   submitQuery: (sessionId, text, mode = 'deep') => 
-    fetchApi(`/sessions/${sessionId}/queries/`, {
+    fetchApi(`/sessions/${sessionId}/queries`, {
       method: 'POST',
       body: JSON.stringify({ text, mode }),
     }),

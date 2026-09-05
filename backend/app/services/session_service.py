@@ -1,8 +1,22 @@
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, delete
 
 from app.models.session import Session
+from app.models.query import Query
+from app.models.document import Document
+from app.models.artifact import Artifact
+from app.models.monitoring import MonitoringJob, ResearchBaselineSnapshot
+from app.models.project_memory import ProjectMemoryItem
+from app.models.source import Source
+from app.models.claim import Claim
+from app.models.evidence import Evidence
+from app.models.contradiction import Contradiction
+from app.models.critique_report import CritiqueReport
+from app.models.decision import Decision
+from app.models.hypothesis import Hypothesis
+from app.models.agent_run import AgentRun
+from app.models.data_analysis import DataQueryRecord, VisualizationSpec, ReproducibleArtifact
 from app.schemas.session import SessionCreate
 
 class SessionService:
@@ -47,3 +61,53 @@ class SessionService:
             await self.db.commit()
             await self.db.refresh(session)
         return session
+
+    async def update_session_title(self, session_id: UUID, title: str) -> Session | None:
+        session = await self.get_session(session_id)
+        if session:
+            session.title = title
+            await self.db.commit()
+            await self.db.refresh(session)
+        return session
+
+    async def delete_session(self, session_id: UUID) -> bool:
+        session = await self.get_session(session_id)
+        if not session:
+            return False
+
+        str_session_id = str(session_id)
+
+        # 1. Fetch query IDs for this session
+        q_result = await self.db.execute(select(Query.id).where(Query.session_id == session_id))
+        query_ids = list(q_result.scalars().all())
+
+        # 2. Delete child records referencing query_id
+        if query_ids:
+            for q_id in query_ids:
+                await self.db.execute(delete(Source).where(Source.query_id == q_id))
+                await self.db.execute(delete(Claim).where(Claim.query_id == q_id))
+                await self.db.execute(delete(Evidence).where(Evidence.query_id == q_id))
+                await self.db.execute(delete(Contradiction).where(Contradiction.query_id == q_id))
+                await self.db.execute(delete(CritiqueReport).where(CritiqueReport.query_id == q_id))
+                await self.db.execute(delete(Decision).where(Decision.query_id == q_id))
+                await self.db.execute(delete(Hypothesis).where(Hypothesis.query_id == q_id))
+                await self.db.execute(delete(AgentRun).where(AgentRun.query_id == q_id))
+                await self.db.execute(delete(DataQueryRecord).where(DataQueryRecord.query_id == q_id))
+                await self.db.execute(delete(VisualizationSpec).where(VisualizationSpec.query_id == q_id))
+                await self.db.execute(delete(ReproducibleArtifact).where(ReproducibleArtifact.query_id == q_id))
+                await self.db.execute(delete(Artifact).where(Artifact.query_id == q_id))
+
+        # 3. Delete child records referencing session_id
+        await self.db.execute(delete(MonitoringJob).where(MonitoringJob.session_id == session_id))
+        await self.db.execute(delete(ResearchBaselineSnapshot).where(ResearchBaselineSnapshot.session_id == session_id))
+        await self.db.execute(delete(ProjectMemoryItem).where(ProjectMemoryItem.session_id == session_id))
+        await self.db.execute(delete(Document).where(Document.session_id == session_id))
+        await self.db.execute(delete(Artifact).where(Artifact.session_id == session_id))
+        await self.db.execute(delete(Query).where(Query.session_id == session_id))
+
+        # 4. Delete session itself
+        await self.db.delete(session)
+        await self.db.commit()
+        return True
+
+

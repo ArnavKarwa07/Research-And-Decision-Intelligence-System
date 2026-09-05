@@ -35,3 +35,30 @@ async def get_session(session_id: UUID, db: AsyncSession = Depends(get_db)):
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     return session
+
+@router.patch('/{session_id}', response_model=SessionResponse)
+@router.patch('/{session_id}/', response_model=SessionResponse)
+@router.put('/{session_id}', response_model=SessionResponse)
+@router.put('/{session_id}/', response_model=SessionResponse)
+async def update_session(session_id: UUID, data: SessionCreate, db: AsyncSession = Depends(get_db)):
+    """Update a session's title or details."""
+    service = SessionService(db)
+    if data.title:
+        session = await service.update_session_title(session_id, data.title)
+    else:
+        session = await service.get_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return session
+
+@router.delete('/{session_id}', status_code=status.HTTP_204_NO_CONTENT)
+@router.delete('/{session_id}/', status_code=status.HTTP_204_NO_CONTENT)
+async def delete_session(session_id: UUID, db: AsyncSession = Depends(get_db)):
+    """Delete a session by ID."""
+    service = SessionService(db)
+    deleted = await service.delete_session(session_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return None
+
+

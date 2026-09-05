@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 
-export default function QueryInput({ onSubmit, isLoading, disabled, onUploadDocument, onAddFact }) {
+export default function QueryInput({ onSubmit, isLoading, disabled, activeTab, onUploadDocument, onAddFact }) {
   const [text, setText] = useState('');
   const [mode, setMode] = useState('deep');
   const [showPlusMenu, setShowPlusMenu] = useState(false);
@@ -60,23 +60,27 @@ export default function QueryInput({ onSubmit, isLoading, disabled, onUploadDocu
         {/* Plus Action Popover Menu */}
         {showPlusMenu && (
           <div className="absolute bottom-full mb-3 left-4 bg-surface-container-high border border-outline-variant rounded-xl p-2 shadow-2xl z-50 flex flex-col gap-1 w-64 text-xs font-mono">
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-surface-container text-on-surface hover:text-primary transition-all text-left cursor-pointer font-bold"
-            >
-              <span className="material-symbols-outlined text-base text-primary">cloud_upload</span>
-              <span>Upload Document (RAG)</span>
-            </button>
+            {activeTab !== 'Knowledge' && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-surface-container text-on-surface hover:text-primary transition-all text-left cursor-pointer font-bold"
+                >
+                  <span className="material-symbols-outlined text-base text-primary">cloud_upload</span>
+                  <span>Upload Document (RAG)</span>
+                </button>
 
-            <button
-              type="button"
-              onClick={() => setShowFactInput(!showFactInput)}
-              className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-surface-container text-on-surface hover:text-primary transition-all text-left cursor-pointer font-bold"
-            >
-              <span className="material-symbols-outlined text-base text-primary">psychology</span>
-              <span>Add Project Fact</span>
-            </button>
+                <button
+                  type="button"
+                  onClick={() => setShowFactInput(!showFactInput)}
+                  className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-surface-container text-on-surface hover:text-primary transition-all text-left cursor-pointer font-bold"
+                >
+                  <span className="material-symbols-outlined text-base text-primary">psychology</span>
+                  <span>Add Project Fact</span>
+                </button>
+              </>
+            )}
 
             <div className="border-t border-outline-variant/60 my-1 pt-1 text-[10px] text-outline px-3 uppercase tracking-wider font-bold">
               Research Mode
@@ -145,33 +149,12 @@ export default function QueryInput({ onSubmit, isLoading, disabled, onUploadDocu
               <span className="material-symbols-outlined text-base">add</span>
             </button>
 
-            <span className="text-[10px] font-bold text-outline uppercase tracking-wider ml-1">
-              Mode:
+            <span className="text-xs font-bold text-primary px-2 py-0.5 bg-primary/10 border border-primary/20 rounded-md ml-1 shadow-sm flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-[14px]">
+                {mode === 'deep' ? 'search' : mode === 'adversarial' ? 'shield' : mode === 'data_analyst' ? 'analytics' : 'bolt'}
+              </span>
+              {mode === 'deep' ? 'Deep Research' : mode === 'adversarial' ? 'Adversarial Audit' : mode === 'data_analyst' ? 'Data Analyst' : 'Quick Answer'}
             </span>
-
-            {[
-              { id: 'deep', label: 'Deep Research', icon: 'search' },
-              { id: 'adversarial', label: 'Adversarial Audit', icon: 'shield' },
-              { id: 'data_analyst', label: 'Data Analyst', icon: 'analytics' },
-              { id: 'quick', label: 'Quick Answer', icon: 'bolt' },
-            ].map((m) => {
-              const isActive = mode === m.id;
-              return (
-                <button
-                  key={m.id}
-                  type="button"
-                  onClick={() => setMode(m.id)}
-                  className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
-                    isActive
-                      ? 'bg-primary/20 text-primary border border-primary/50 shadow-sm font-bold'
-                      : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container/50 border border-transparent'
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-xs">{m.icon}</span>
-                  <span>{m.label}</span>
-                </button>
-              );
-            })}
           </div>
         </div>
 
@@ -179,7 +162,10 @@ export default function QueryInput({ onSubmit, isLoading, disabled, onUploadDocu
         <div className="flex items-end gap-3">
           <textarea
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onChange={(e) => {
+              setText(e.target.value);
+              if (showPlusMenu) setShowPlusMenu(false);
+            }}
             onKeyDown={handleKeyDown}
             disabled={disabled || isLoading}
             placeholder={

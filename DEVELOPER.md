@@ -51,8 +51,56 @@ The application will be accessible on Vite's native dev port: **`http://localhos
 
 The codebase enforces a strict **Zero Non-Functional UI & Zero Dummy Data** policy:
 - **Pruned Placeholder UI**: All non-functional links, dummy tabs, and dead buttons have been removed. Every visible element performs a real action (creating sessions, submitting queries, switching research modes, opening live terminal telemetry logs, copying evidence, or exporting PDF reports).
-- **Web Search**: Integrates live DuckDuckGo HTML web search (`_duckduckgo_search`) in `backend/app/tools/web_search.py` so real searches run out-of-the-box without requiring API keys or mock data.
+- **Multi-Source Web Search Aggregator**: Integrates multi-source web search aggregation ([`web_search.py`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/tools/web_search.py)) combining live DuckDuckGo HTML web search (`_duckduckgo_search`), Wikipedia REST API (`_wikipedia_search`), arXiv API (`_arxiv_search`), and news/market fallbacks out-of-the-box without requiring API keys or mock data.
 - **Real Error Handling**: Network or backend exceptions display real error banners with interactive retry triggers.
+
+## Multi-Source Web Search Aggregator Architecture
+
+The [`WebSearchTool`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/tools/web_search.py) acts as a pluggable, high-resilience web intelligence gathering engine:
+
+1. **Concurrent Multi-Source Aggregation Pipeline**:
+   - `search()` dispatches parallel async tasks (`asyncio.gather`) querying **`ddgs` / `duckduckgo_search` Python library** (with fallback to **DuckDuckGo Lite/HTML** scrapers), **Wikipedia REST API**, and **arXiv API**.
+   - Handles SSL errors using custom fallback SSL contexts (`ssl.create_default_context` with disabled hostname verification when local network proxies interfere).
+2. **Source Balancing Rules & Academic Capping**:
+   - Academic literature from the arXiv API is strictly capped at $\le 2$ items (`arxiv_capped = arxiv_results[:2]`) to prevent research runs from becoming skewed heavily toward academic preprints.
+   - Results are interleaved using a round-robin scheduler across primary Web, Wikipedia, and arXiv source queues, ensuring balanced distribution across general web, encyclopedia context, and academic literature.
+3. **Web / News Fallback Injection**:
+   - When DuckDuckGo scrapers encounter HTTP 202/403 automated request blocks or return zero web results, [`WebSearchTool`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/tools/web_search.py) injects a query-parameterized fallback pool consisting of Google Scholar, Economic Times, Yahoo Finance, and BBC News.
+   - Guarantees non-empty web telemetry and prevents 100% arXiv/Wikipedia skew.
+4. **URL Normalization & Deduplication**:
+   - Normalizes URLs (lowercasing, trailing slash removal) and deduplicates results across web scrapers and academic APIs before returning ordered `WebSearchResult` objects.
+
+## LLM Provider Configuration & Rotational Failover Mechanics
+
+RADIS features a unified multi-provider LLM orchestration tier supporting **Google Gemini**, **OpenAI**, **Anthropic**, and a local deterministic **Mock Provider**:
+
+1. **Rotational Gemini Provider (`RotationalGeminiProvider`, `RotationalChatGoogleGenerativeAI`)**:
+   - Model execution routes through a rotational candidate model chain defined in [`llm_provider.py`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/agents/llm_provider.py) and [`graph.py`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/agents/graph.py):
+     ```python
+     CANDIDATE_MODELS = [
+         "gemini-flash-latest",
+         "gemini-flash-lite-latest",
+         "gemini-1.5-flash",
+         "gemma-2-27b-it",
+         "gemma-2-9b-it"
+     ]
+     ```
+   - **Failover Mechanics**: On encountering rotatable API errors (HTTP 429 Rate Limit, 503 Service Unavailable, 404 Model Not Found, 400 Invalid Argument, or Resource Exhausted quota limits), the provider catches the exception, logs a warning, and automatically rotates to the next model in the candidate list.
+   - Preserves state index across requests to maintain high throughput while recovering seamlessly from model rate limits or endpoint outages.
+
+2. **Unified Environment Configuration**:
+   - Flexible key resolution checks `GEMINI_API_KEY`, `GOOGLE_API_KEY`, `GOOGLE_SEARCH_API_KEY`, and `GOOGLE_SEARCH_ENGINE_ID` / `GOOGLE_CX` across process environment and application settings (`app/config.py`).
+
+3. **Prompt Injection XML Shielding**:
+   - External web search snippets and document RAG chunks are passed to LLM prompts enclosed inside `<retrieved_snippets>` XML boundaries across all state machine nodes (`graph.py`, `synthesis_node`).
+   - Prevents indirect prompt injection attacks from malicious web content attempting to alter LLM system instructions or synthesize unauthorized responses.
+
+4. **Dynamic Option Generation & Content-First Synthesis Principles**:
+   - All synthesis logic in [`synthesis.py`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/agents/synthesis.py) enforces content-first synthesis:
+     - Extracts candidate sentences directly from verified claims and retrieved snippets.
+     - Selects articulate sentence clauses (15 to 65 characters) representing distinct strategic directions.
+     - Formulates query topic-grounded option titles (e.g., `Accelerated Domain Implementation for {topic_phrase}`) rather than mechanically concatenating titles or relying on static boilerplate templates.
+   - Eliminates generic corporate jargon defaults (e.g. legacy lithography/fabrication templates) in favor of dynamic, query-tailored strategic matrices.
 
 ## Agent Engineering Rules
 

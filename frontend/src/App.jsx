@@ -20,6 +20,46 @@ export default function App() {
   const [plan, setPlan] = useState([]);
   const [decisionMatrix, setDecisionMatrix] = useState(null);
   const [claims, setClaims] = useState([]);
+  const [sensitivityWeights, setSensitivityWeights] = useState({ baseWeight: 0.4, worstWeight: 0.2 });
+
+  // Sync sensitivity weights with localStorage (checking session-specific first, then global fallback)
+  useEffect(() => {
+    try {
+      if (activeSessionId) {
+        const sessionSaved = localStorage.getItem(`radis_sensitivity_${activeSessionId}`);
+        if (sessionSaved) {
+          const parsed = JSON.parse(sessionSaved);
+          if (parsed && typeof parsed.baseWeight === 'number' && typeof parsed.worstWeight === 'number') {
+            setSensitivityWeights(parsed);
+            return;
+          }
+        }
+      }
+      const globalSaved = localStorage.getItem('radis_sensitivity_global');
+      if (globalSaved) {
+        const parsed = JSON.parse(globalSaved);
+        if (parsed && typeof parsed.baseWeight === 'number' && typeof parsed.worstWeight === 'number') {
+          setSensitivityWeights(parsed);
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to read sensitivity weights from localStorage:', e);
+    }
+  }, [activeSessionId]);
+
+  const handleWeightChange = useCallback((newBase, newWorst) => {
+    const updated = { baseWeight: newBase, worstWeight: newWorst };
+    setSensitivityWeights(updated);
+    try {
+      localStorage.setItem('radis_sensitivity_global', JSON.stringify(updated));
+      if (activeSessionId) {
+        localStorage.setItem(`radis_sensitivity_${activeSessionId}`, JSON.stringify(updated));
+      }
+    } catch (e) {
+      console.warn('Failed to save sensitivity weights to localStorage:', e);
+    }
+  }, [activeSessionId]);
 
   // ChatGPT-Style 3 Main View Tabs
   const [activeTab, setActiveTab] = useState('Conversation');
@@ -27,6 +67,7 @@ export default function App() {
   const [showExportModal, setShowExportModal] = useState(false);
 
   const streamCleanupRef = useRef(null);
+  const isInitialMountRef = useRef(true);
 
   const resetWorkspace = useCallback(() => {
     setSteps([]);
@@ -57,25 +98,63 @@ export default function App() {
     }
   }, [resetWorkspace]);
 
+  const loadSessionHistory = useCallback(async (sessionId) => {
+    try {
+      const queries = await api.getSessionQueries(sessionId);
+      if (queries && queries.length > 0) {
+        const completedQueries = queries.filter(q => q.research_plan);
+        const targetQuery = completedQueries.length > 0 ? completedQueries[completedQueries.length - 1] : queries[queries.length - 1];
+        setCurrentQuery(targetQuery);
+        if (targetQuery.research_plan) {
+          try {
+            const parsed = typeof targetQuery.research_plan === 'string' ? JSON.parse(targetQuery.research_plan) : targetQuery.research_plan;
+            if (parsed.decision_matrix) setDecisionMatrix(parsed.decision_matrix);
+            if (parsed.plan) setPlan(parsed.plan);
+            if (parsed.evidence) setEvidence(parsed.evidence);
+            if (parsed.claims) setClaims(parsed.claims);
+            if (parsed.steps) setSteps(parsed.steps);
+          } catch (err) {
+            console.warn('Failed to parse saved research plan:', err);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load session query history:', e);
+    }
+  }, []);
+
   useEffect(() => {
+    if (!isInitialMountRef.current) return;
+    isInitialMountRef.current = false;
     let isSubscribed = true;
-    api.createSession({ title: 'New Research Workspace' })
-      .then((newSession) => {
+
+    api.getSessions()
+      .then((res) => {
         if (!isSubscribed) return;
-        setSessions([newSession]);
-        setActiveSessionId(newSession.id);
+        const fetchedSessions = res.items || [];
+        if (fetchedSessions.length > 0) {
+          setSessions(fetchedSessions);
+          const firstId = fetchedSessions[0].id;
+          setActiveSessionId(firstId);
+          loadSessionHistory(firstId);
+        } else {
+          api.createSession({ title: 'New Research Workspace' }).then((newSession) => {
+            if (!isSubscribed) return;
+            setSessions([newSession]);
+            setActiveSessionId(newSession.id);
+          });
+        }
       })
       .catch((e) => {
         if (!isSubscribed) return;
-        console.error('Initial session creation failed:', e);
-        setErrorMsg(`Backend server offline or connecting: ${e.message}`);
+        console.error('Initial sessions fetch failed:', e);
       });
 
     return () => {
       isSubscribed = false;
       if (streamCleanupRef.current) streamCleanupRef.current();
     };
-  }, []);
+  }, [loadSessionHistory]);
 
   const handleSelectSession = (id) => {
     if (streamCleanupRef.current) {
@@ -84,7 +163,33 @@ export default function App() {
     }
     setActiveSessionId(id);
     resetWorkspace();
+    loadSessionHistory(id);
   };
+
+  const handleDeleteSession = async (idToDelete) => {
+    try {
+      await api.deleteSession(idToDelete);
+      const remaining = sessions.filter((s) => s.id !== idToDelete);
+      setSessions(remaining);
+      if (activeSessionId === idToDelete) {
+        if (remaining.length > 0) {
+          if (streamCleanupRef.current) {
+            streamCleanupRef.current();
+            streamCleanupRef.current = null;
+          }
+          setActiveSessionId(remaining[0].id);
+          resetWorkspace();
+          loadSessionHistory(remaining[0].id);
+        } else {
+          handleNewSession();
+        }
+      }
+    } catch (e) {
+      console.error('Failed to delete session:', e);
+      setErrorMsg(`Failed to delete thread: ${e.message}`);
+    }
+  };
+
 
   const handleSubmitQuery = async (text, mode = 'deep') => {
     if (!activeSessionId) return;
@@ -107,12 +212,25 @@ export default function App() {
       const queryRes = await api.submitQuery(activeSessionId, text, mode);
       setCurrentQuery(queryRes);
 
-      const cleanup = connectToStream(activeSessionId, {
+      // Update session title in sidebar list and persist to backend
+      const shortTitle = text.length > 35 ? `${text.slice(0, 35)}...` : text;
+      const formattedTitle = `Thread: "${shortTitle}"`;
+      api.updateSession(activeSessionId, { title: formattedTitle }).catch((e) => {
+        console.warn('Failed to persist session title to backend:', e);
+      });
+      setSessions((prev) =>
+        prev.map((s) => (s.id === activeSessionId ? { ...s, title: formattedTitle } : s))
+      );
+
+      const cleanup = connectToStream(queryRes.id, {
         onStep: (step) => {
-          setSteps((prev) => [...prev, step]);
-          if (step.agentType === 'planner' && step.details?.plan) {
-            setPlan(step.details.plan);
-          }
+          const normalizedStep = {
+            ...step,
+            agentType: step.agentType || step.agent_type || 'Agent',
+            message: step.message || step.execution_log?.message || '',
+            status: step.status || 'completed'
+          };
+          setSteps((prev) => [...prev, normalizedStep]);
         },
         onEvidence: (evidenceItem) => setEvidence((prev) => [...prev, evidenceItem]),
         onClaim: (claimItem) => setClaims((prev) => [...prev, claimItem]),
@@ -120,10 +238,11 @@ export default function App() {
         onComplete: (data) => {
           setIsResearching(false);
           if (data.decision_matrix) setDecisionMatrix(data.decision_matrix);
+          if (data.plan) setPlan(data.plan);
+          if (data.evidence) setEvidence(data.evidence);
         },
         onError: (err) => {
           console.error('Stream error:', err);
-          setErrorMsg(`Research run error: ${err.message}`);
           setIsResearching(false);
         },
       });
@@ -145,6 +264,7 @@ export default function App() {
         activeSessionId={activeSessionId}
         onNewSession={handleNewSession}
         onSelectSession={handleSelectSession}
+        onDeleteSession={handleDeleteSession}
         activeTab={activeTab}
         onSelectTab={setActiveTab}
       />
@@ -201,13 +321,21 @@ export default function App() {
         </header>
 
         {/* View Canvas Body */}
-        <main className="flex-1 overflow-y-auto p-6 relative">
+        <main className="flex-1 overflow-y-auto p-6 pb-40 relative">
           {errorMsg && (
             <div className="p-3 mb-4 rounded-lg border border-error/40 bg-error-container/20 text-error flex justify-between items-center text-xs">
               <span>{errorMsg}</span>
-              <button onClick={handleNewSession} className="px-3 py-1 bg-error text-on-error font-bold rounded cursor-pointer">
-                Reset Session
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setErrorMsg(null)}
+                  title="Dismiss error message"
+                  className="px-2 py-1 bg-surface-container border border-error/40 text-error font-bold rounded hover:bg-error/20 cursor-pointer text-xs flex items-center gap-1"
+                >
+                  <span className="material-symbols-outlined text-xs">close</span>
+                  <span>Dismiss</span>
+                </button>
+              </div>
             </div>
           )}
 
@@ -227,6 +355,9 @@ export default function App() {
           ) : activeTab === 'Analytics' ? (
             <DecisionAnalyticsView
               decisionMatrix={decisionMatrix}
+              baseWeight={sensitivityWeights.baseWeight}
+              worstWeight={sensitivityWeights.worstWeight}
+              onWeightChange={handleWeightChange}
               onExportTrigger={() => setShowExportModal(true)}
             />
           ) : (
@@ -236,11 +367,14 @@ export default function App() {
           )}
 
           {/* Floating Prompt Input Dock */}
-          <QueryInput
-            onSubmit={handleSubmitQuery}
-            isLoading={isResearching}
-            disabled={!activeSessionId}
-          />
+          {activeTab === 'Conversation' && (
+            <QueryInput
+              onSubmit={handleSubmitQuery}
+              isLoading={isResearching}
+              disabled={!activeSessionId}
+              activeTab={activeTab}
+            />
+          )}
         </main>
       </div>
 

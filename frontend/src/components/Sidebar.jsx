@@ -5,6 +5,7 @@ export default function Sidebar({
   activeSessionId = null,
   onNewSession,
   onSelectSession,
+  onDeleteSession,
   activeTab = 'Conversation',
   onSelectTab = null,
 }) {
@@ -34,52 +35,6 @@ export default function Sidebar({
         </button>
       </div>
 
-      {/* Workspace Navigation Links */}
-      {onSelectTab && (
-        <div className="px-4 mb-4 space-y-1 font-mono text-xs">
-          <h3 className="text-[10px] font-bold text-outline mb-2 uppercase border-b border-outline-variant pb-1 tracking-wider">
-            Workspace Views
-          </h3>
-          <button
-            type="button"
-            onClick={() => onSelectTab('Conversation')}
-            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md transition-all text-left font-semibold cursor-pointer ${
-              activeTab === 'Conversation'
-                ? 'bg-primary/20 text-primary border border-primary/50 shadow-sm'
-                : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container/50'
-            }`}
-          >
-            <span className="material-symbols-outlined text-sm">chat</span>
-            <span>Research Stream</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onSelectTab('Analytics')}
-            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md transition-all text-left font-semibold cursor-pointer ${
-              activeTab === 'Analytics'
-                ? 'bg-primary/20 text-primary border border-primary/50 shadow-sm'
-                : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container/50'
-            }`}
-          >
-            <span className="material-symbols-outlined text-sm">analytics</span>
-            <span>Decision Analytics</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onSelectTab('Knowledge')}
-            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md transition-all text-left font-semibold cursor-pointer ${
-              activeTab === 'Knowledge'
-                ? 'bg-primary/20 text-primary border border-primary/50 shadow-sm'
-                : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container/50'
-            }`}
-          >
-            <span className="material-symbols-outlined text-sm">folder_open</span>
-            <span>Knowledge & Memory</span>
-          </button>
-        </div>
-      )}
 
       {/* Threads List */}
       <div className="flex-1 overflow-y-auto px-4">
@@ -97,14 +52,30 @@ export default function Sidebar({
                   key={s.id}
                   type="button"
                   onClick={() => onSelectSession(s.id)}
-                  className={`w-full text-left px-3 py-2 rounded-md transition-all text-xs truncate flex items-center gap-2 font-medium cursor-pointer ${
+                  className={`group w-full text-left px-3 py-2 rounded-md transition-all text-xs flex items-center justify-between font-medium cursor-pointer ${
                     isSelected
                       ? 'bg-surface-container-high text-primary font-bold border border-outline-variant'
                       : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container/40'
                   }`}
                 >
-                  <span className="material-symbols-outlined text-xs text-outline">forum</span>
-                  <span className="truncate">{s.title || 'Untitled Task'}</span>
+                  <div className="flex items-center gap-2 truncate flex-1 min-w-0">
+                    <span className="material-symbols-outlined text-xs text-outline shrink-0">forum</span>
+                    <span className="truncate">{s.title || 'Untitled Task'}</span>
+                  </div>
+                  {onDeleteSession && (
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      title="Delete thread"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteSession(s.id);
+                      }}
+                      className="opacity-0 group-hover:opacity-100 p-1 text-on-surface-variant hover:text-error hover:bg-surface-container-highest rounded transition-all shrink-0 ml-1 cursor-pointer flex items-center justify-center"
+                    >
+                      <span className="material-symbols-outlined text-xs leading-none">delete</span>
+                    </span>
+                  )}
                 </button>
               );
             })

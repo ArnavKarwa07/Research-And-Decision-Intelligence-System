@@ -23,21 +23,29 @@ async def stream_query(query_id: UUID, request: Request, db=Depends(get_db)):
     subscriber_id, event_generator = await stream_service.subscribe(query_id)
     
     async def sse_generator():
+        yield {"comment": "stream connected"}
         try:
-            while True:
-                if await request.is_disconnected():
-                    break
-                try:
-                    event = await asyncio.wait_for(anext(event_generator), timeout=1.0)
-                    yield {
-                        "event": event.event_type,
-                        "data": event.model_dump_json()
-                    }
-                except StopAsyncIteration:
-                    break
-                except asyncio.TimeoutError:
+            async for event in event_generator:
+                if event.event_type == "ping":
+                    yield {"comment": "ping"}
                     continue
+                yield {
+                    "event": event.event_type,
+                    "data": event.model_dump_json()
+                }
+                if event.event_type in ("complete", "error"):
+                    await asyncio.sleep(0.5)
+                    break
+        except (asyncio.CancelledError, Exception):
+            pass
         finally:
             stream_service.unsubscribe(query_id, subscriber_id)
             
-    return EventSourceResponse(sse_generator())
+    return EventSourceResponse(
+        sse_generator(),
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
+    )

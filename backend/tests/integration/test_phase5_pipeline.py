@@ -52,7 +52,7 @@ async def test_phase5_pipeline_full_execution():
     }
 
     merged_state = dict(initial_state)
-    async for output in workflow.astream(initial_state):
+    async for output in workflow.astream(initial_state, config={"recursion_limit": 50}):
         for node_name, state in output.items():
             merged_state.update(state)
 

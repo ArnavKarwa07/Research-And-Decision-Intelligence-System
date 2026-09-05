@@ -64,7 +64,15 @@ class DecisionAgent(BaseAgent):
             criteria_names = [str(c.get("name", c.get("id", ""))) for c in criteria]
             enriched_alternatives = []
             for alt in alternatives:
-                alt_copy = dict(alt)
+                if hasattr(alt, "model_dump"):
+                    alt_copy = alt.model_dump()
+                elif hasattr(alt, "dict"):
+                    alt_copy = alt.dict()
+                elif isinstance(alt, dict):
+                    alt_copy = dict(alt)
+                else:
+                    alt_copy = {"name": str(alt)}
+
                 scores = dict(alt_copy.get("scores") or {})
                 for cid, cname in zip(criteria_ids, criteria_names):
                     if cid not in scores and cname not in scores:
@@ -135,30 +143,125 @@ class DecisionAgent(BaseAgent):
             else:
                 self.expected_value_result = {"expected_values": {}, "best_ev_alternative": ""}
 
-            self.risks = input_data.get("risks", [
-                "Uncertain market adoption rate",
-                "Vendor dependencies and potential lock-in",
-                "Resource constraints during initial deployment"
-            ])
-            self.assumptions = input_data.get("assumptions", [
-                "Criteria weights accurately reflect user priorities",
-                "Baseline cost estimations hold within +/- 15% margin",
-                "No major regulatory shifts occur within planning horizon"
-            ])
-            self.triggers = input_data.get("decision_triggers", [
-                {
-                    "condition": "Cost overrun exceeds 20% threshold",
-                    "threshold": "> 20%",
-                    "action": "Trigger immediate re-evaluation and switch to Option B",
-                    "severity": "high"
-                },
-                {
-                    "condition": "Key criteria weight shift > 15%",
-                    "threshold": "> 15%",
-                    "action": "Re-run sensitivity matrix",
-                    "severity": "medium"
-                }
-            ])
+            query_topic = input_data.get("query_text") or input_data.get("topic") or input_data.get("objective") or "Target Decision Objective"
+            clean_top = str(query_topic).strip()
+            short_top = clean_top[:45] + "..." if len(clean_top) > 45 else clean_top
+
+            claims = input_data.get("claims") or []
+            snippets = input_data.get("snippets") or []
+            contradictions = input_data.get("contradictions") or []
+            hypotheses = input_data.get("hypotheses") or []
+
+            # Extract clean sentences across evidence items for dynamic grounding
+            extracted_sentences: List[str] = []
+            raw_items = (claims or []) + (snippets or [])
+            for item in raw_items:
+                content = ""
+                if isinstance(item, dict):
+                    content = item.get("snippet") or item.get("content") or item.get("description") or ""
+                elif isinstance(item, str):
+                    content = item
+                else:
+                    content = str(item)
+                if content and len(content) > 15:
+                    import re
+                    sents = [s.strip() for s in re.split(r'[.!?]\s+', str(content)) if len(s.strip()) > 15]
+                    extracted_sentences.extend(sents)
+
+            unique_sents: List[str] = []
+            for s in extracted_sentences:
+                if s not in unique_sents:
+                    unique_sents.append(s)
+
+            # Dynamically extract risks from input claims, contradictions, or snippet sentences
+            if "risks" in input_data and input_data["risks"]:
+                self.risks = input_data["risks"]
+            else:
+                extracted_risks = []
+                for contra in contradictions:
+                    c_desc = contra.get("description") if isinstance(contra, dict) else str(contra)
+                    if c_desc:
+                        extracted_risks.append(f"Evidence contradiction: {c_desc[:120]}")
+
+                for c in claims:
+                    if isinstance(c, dict):
+                        conf = float(c.get("confidence", 1.0))
+                        content = c.get("content", "")
+                        status = c.get("support_status", "SUPPORTED")
+                        if conf < 0.85 or status != "SUPPORTED" or any(kw in content.lower() for kw in ["risk", "latency", "cost", "challenge", "bottleneck", "uncertainty"]):
+                            extracted_risks.append(f"Uncertainty in claim: '{content[:120]}'")
+
+                for h in hypotheses:
+                    if isinstance(h, dict) and h.get("vulnerabilities"):
+                        for vul in h["vulnerabilities"][:2]:
+                            extracted_risks.append(f"Hypothesis vulnerability: {vul[:120]}")
+
+                if not extracted_risks and unique_sents:
+                    for s in unique_sents:
+                        if any(kw in s.lower() for kw in ["risk", "cost", "delay", "challenge", "bottleneck", "limit", "overhead"]):
+                            extracted_risks.append(f"Grounding risk: {s}")
+
+                if not extracted_risks:
+                    s_ref = unique_sents[0] if unique_sents else f"Operational execution parameters for '{clean_top}'"
+                    extracted_risks = [
+                        f"Operational friction and implementation complexity: {s_ref[:100]}",
+                        f"Resource allocation constraints and scheduling variance during deployment of '{short_top}'",
+                        f"External requirement shifts or environment changes for '{short_top}'"
+                    ]
+                self.risks = extracted_risks[:5]
+
+            # Dynamically extract assumptions from claims, evidence, or snippet sentences
+            if "assumptions" in input_data and input_data["assumptions"]:
+                self.assumptions = input_data["assumptions"]
+            else:
+                extracted_assumptions = []
+                for c in claims:
+                    if isinstance(c, dict) and float(c.get("confidence", 0.0)) >= 0.85:
+                        c_text = c.get("content", "")
+                        if c_text and len(c_text) > 10:
+                            extracted_assumptions.append(f"Assumes verified claim holds: '{c_text[:120]}'")
+
+                if not extracted_assumptions and unique_sents:
+                    for s in unique_sents[:3]:
+                        extracted_assumptions.append(f"Assumes empirical finding: '{s[:120]}'")
+
+                if not extracted_assumptions:
+                    extracted_assumptions = [
+                        f"Assumes evaluation criteria weights accurately reflect priority focus for '{short_top}'",
+                        f"Assumes baseline research evidence and domain parameters remain stable for '{short_top}'",
+                        f"Assumes execution team and resources remain available as scheduled"
+                    ]
+                self.assumptions = extracted_assumptions[:5]
+
+            # Dynamically extract/construct decision triggers from claims/alternatives/topic
+            if "decision_triggers" in input_data and input_data["decision_triggers"]:
+                self.triggers = input_data["decision_triggers"]
+            elif "triggers" in input_data and input_data["triggers"]:
+                self.triggers = input_data["triggers"]
+            else:
+                s_trigger = unique_sents[0] if unique_sents else f"Primary domain evidence for '{short_top}'"
+                extracted_triggers = [
+                    {
+                        "condition": f"Confidence score for evidence ('{s_trigger[:60]}...') drops below 75%",
+                        "threshold": "< 75% confidence",
+                        "action": "Trigger immediate re-evaluation and pivot to secondary fallback option",
+                        "severity": "high"
+                    },
+                    {
+                        "condition": f"Key criteria weight shift or operational variance for '{short_top}' > 15%",
+                        "threshold": "> 15%",
+                        "action": "Re-run multi-criteria sensitivity matrix and trade-off scoring",
+                        "severity": "medium"
+                    }
+                ]
+                if contradictions:
+                    extracted_triggers.append({
+                        "condition": f"Critical contradiction detected in active evidence stream for '{short_top}'",
+                        "threshold": "Critical Severity",
+                        "action": "Pause execution pipeline and initiate red-team audit pass",
+                        "severity": "critical"
+                    })
+                self.triggers = extracted_triggers
 
             return StepResult(
                 action="finalize_decision",

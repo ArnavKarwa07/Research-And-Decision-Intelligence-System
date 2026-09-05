@@ -1,14 +1,47 @@
-import React, { useState } from 'react';
+import React from 'react';
 
-export default function DecisionAnalyticsView({ decisionMatrix = null, onExportTrigger = null }) {
-  const [baseWeight, setBaseWeight] = useState(0.4);
-  const [worstWeight, setWorstWeight] = useState(0.2);
+export default function DecisionAnalyticsView({
+  decisionMatrix = null,
+  baseWeight = 0.4,
+  worstWeight = 0.2,
+  onWeightChange = null,
+  onExportTrigger = null
+}) {
+  const rawAlternatives = decisionMatrix?.alternatives || [];
 
-  const mockAlternatives = decisionMatrix?.alternatives || [
-    { name: 'Option A: Cloud-Native Microservices Architecture', score: 8.8, pros: ['High scalability', 'Isolated failure domains'], cons: ['Higher operational complexity'] },
-    { name: 'Option B: Hybrid Serverless & Modular Monolith', score: 7.6, pros: ['Lower initial cost', 'Fast deployment'], cons: ['Vendor lock-in risks'] },
-    { name: 'Option C: On-Premises Air-Gapped Appliance', score: 6.2, pros: ['Maximum security compliance'], cons: ['High infrastructure CAPEX'] },
-  ];
+  // Dynamic MCDA Score recalculation based on interactive sensitivity sliders
+  const dynamicAlternatives = rawAlternatives.map((alt) => {
+    const rawScore = typeof alt.score === 'number' ? alt.score : parseFloat(alt.score) || 7.5;
+    const growthMult = baseWeight / 0.4;
+    const penaltyFactor = 1 - (worstWeight - 0.2) * 0.6;
+    const computedScore = Math.min(10, Math.max(1, Math.round(rawScore * growthMult * penaltyFactor * 10) / 10));
+
+    return {
+      ...alt,
+      computedScore,
+      pros: Array.isArray(alt.pros) ? alt.pros : [alt.pros || 'Strong objective alignment'],
+      cons: Array.isArray(alt.cons) ? alt.cons : [alt.cons || 'Resource allocation required']
+    };
+  });
+
+  const sortedAlternatives = [...dynamicAlternatives].sort((a, b) => b.computedScore - a.computedScore);
+
+  let tippingPointText = decisionMatrix?.tipping_point || 'Requires completed decision analysis to calculate sensitivity tipping points.';
+  if (sortedAlternatives.length > 0) {
+    if (worstWeight >= baseWeight) {
+      tippingPointText = `Tipping Point Reached: Downside penalty (${Math.round(worstWeight * 100)}%) equals or exceeds growth weight (${Math.round(baseWeight * 100)}%). Defensive risk mitigation strategies prioritize over expansion.`;
+    } else {
+      tippingPointText = `Base Case Growth Weight (${Math.round(baseWeight * 100)}%) dominates Downside Penalty (${Math.round(worstWeight * 100)}%). Top recommended option: '${sortedAlternatives[0]?.name}'.`;
+    }
+  }
+
+  const handleBaseChange = (val) => {
+    if (onWeightChange) onWeightChange(val, worstWeight);
+  };
+
+  const handleWorstChange = (val) => {
+    if (onWeightChange) onWeightChange(baseWeight, val);
+  };
 
   return (
     <div className="flex flex-col gap-6 max-w-5xl mx-auto w-full text-on-surface pb-28 pt-2">
@@ -51,24 +84,32 @@ export default function DecisionAnalyticsView({ decisionMatrix = null, onExportT
             </tr>
           </thead>
           <tbody>
-            {mockAlternatives.map((alt, i) => (
-              <tr key={i} className="border-b border-outline-variant/60 text-xs hover:bg-surface-container/40">
-                <td className="p-4 font-bold text-on-surface">{alt.name}</td>
-                <td className="p-4">
-                  <span className={`px-3 py-1 rounded-full font-bold font-mono text-xs ${
-                    i === 0 ? 'bg-tertiary-container/30 text-tertiary border border-tertiary/40' : 'bg-surface-container text-on-surface-variant border border-outline-variant'
-                  }`}>
-                    {alt.score} / 10
-                  </span>
-                </td>
-                <td className="p-4 text-tertiary font-medium">
-                  {alt.pros.join(', ')}
-                </td>
-                <td className="p-4 text-error font-medium">
-                  {alt.cons.join(', ')}
+            {sortedAlternatives.length === 0 ? (
+              <tr>
+                <td colSpan="4" className="p-8 text-center text-on-surface-variant italic">
+                  Run a query to generate decision alternatives and view the analysis here.
                 </td>
               </tr>
-            ))}
+            ) : (
+              sortedAlternatives.map((alt, i) => (
+                <tr key={i} className="border-b border-outline-variant/60 text-xs hover:bg-surface-container/40">
+                  <td className="p-4 font-bold text-on-surface">{alt.name}</td>
+                  <td className="p-4 whitespace-nowrap min-w-[120px]">
+                    <span className={`px-3 py-1.5 rounded-full font-bold font-mono text-xs whitespace-nowrap inline-flex items-center justify-center gap-1 ${
+                      i === 0 ? 'bg-tertiary-container/30 text-tertiary border border-tertiary/40' : 'bg-surface-container text-on-surface-variant border border-outline-variant'
+                    }`}>
+                      {typeof alt.computedScore === 'number' ? alt.computedScore.toFixed(1) : alt.computedScore} / 10
+                    </span>
+                  </td>
+                  <td className="p-4 text-tertiary font-medium">
+                    {alt.pros.join(', ')}
+                  </td>
+                  <td className="p-4 text-error font-medium">
+                    {alt.cons.join(', ')}
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
@@ -91,7 +132,7 @@ export default function DecisionAnalyticsView({ decisionMatrix = null, onExportT
               max="0.9"
               step="0.05"
               value={baseWeight}
-              onChange={(e) => setBaseWeight(parseFloat(e.target.value))}
+              onChange={(e) => handleBaseChange(parseFloat(e.target.value))}
               className="w-full accent-primary cursor-pointer"
             />
           </div>
@@ -106,7 +147,7 @@ export default function DecisionAnalyticsView({ decisionMatrix = null, onExportT
               max="0.5"
               step="0.05"
               value={worstWeight}
-              onChange={(e) => setWorstWeight(parseFloat(e.target.value))}
+              onChange={(e) => handleWorstChange(parseFloat(e.target.value))}
               className="w-full accent-error cursor-pointer"
             />
           </div>
@@ -114,7 +155,10 @@ export default function DecisionAnalyticsView({ decisionMatrix = null, onExportT
 
         <div className="mt-5 p-3.5 bg-surface-container rounded-lg border border-outline-variant/60 text-xs text-on-surface-variant font-mono flex items-center gap-2">
           <span className="material-symbols-outlined text-base text-primary">lightbulb</span>
-          <span><strong className="text-primary">Sensitivity Tipping Point:</strong> Recommendation flips from Option A to Option B if Base Case weight drops below 25% or Downside Penalty exceeds 40%.</span>
+          <span>
+            <strong className="text-primary">Sensitivity Tipping Point: </strong>
+            {tippingPointText}
+          </span>
         </div>
       </div>
 

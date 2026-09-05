@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     llm_provider: Literal['mock', 'gemini'] = 'gemini'
     gemini_api_key: str = ''
     google_api_key: str = ''
-    gemini_model: str = 'gemini-3.6-flash'
+    gemini_model: str = 'gemini-flash-latest'
     
     search_provider: Literal['duckduckgo', 'google', 'tavily', 'mock'] = 'duckduckgo'
     google_search_api_key: str = ''

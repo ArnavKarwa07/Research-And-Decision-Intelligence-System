@@ -1,16 +1,8 @@
 import React, { useState } from 'react';
 
 export default function KnowledgeMemoryView({ activeSessionId = null }) {
-  const [documents, setDocuments] = useState([
-    { id: 'doc-1', filename: 'Architecture_Roadmap_2026.pdf', size: '2.4 MB', status: 'INDEXED', chunks: 14 },
-    { id: 'doc-2', filename: 'Financial_Projections_Q3.csv', size: '480 KB', status: 'INDEXED', chunks: 8 },
-  ]);
-
-  const [memoryFacts, setMemoryFacts] = useState([
-    { id: 'm-1', memory_type: 'FACT', text: 'Target Qdrant vector namespace segmentation per project collection.', status: 'APPROVED' },
-    { id: 'm-2', memory_type: 'REUSABLE_ASSUMPTION', text: 'Max token budget per sub-task agent execution capped at 25,000 tokens.', status: 'APPROVED' },
-    { id: 'm-3', memory_type: 'LESSON_LEARNED', text: 'Web search tool results must undergo untrusted content wrapping prior to synthesis.', status: 'APPROVED' },
-  ]);
+  const [documents, setDocuments] = useState([]);
+  const [memoryFacts, setMemoryFacts] = useState([]);
 
   const [newFact, setNewFact] = useState('');
 
@@ -60,20 +52,26 @@ export default function KnowledgeMemoryView({ activeSessionId = null }) {
 
         {/* Indexed Document List */}
         <div className="mt-5 flex flex-col gap-2">
-          {documents.map((doc) => (
-            <div key={doc.id} className="flex justify-between items-center p-3.5 bg-surface-container border border-outline-variant/60 rounded-lg text-xs">
-              <div className="flex items-center gap-2.5">
-                <span className="material-symbols-outlined text-primary text-base">description</span>
-                <div>
-                  <span className="font-bold text-on-surface">{doc.filename}</span>
-                  <span className="text-outline font-mono ml-2 text-[11px]">{doc.size}</span>
-                </div>
-              </div>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-tertiary-container/30 text-tertiary border border-tertiary/40">
-                {doc.chunks} Chunks Indexed
-              </span>
+          {documents.length === 0 ? (
+            <div className="text-center p-4 text-xs text-on-surface-variant italic">
+              No documents uploaded yet.
             </div>
-          ))}
+          ) : (
+            documents.map((doc) => (
+              <div key={doc.id} className="flex justify-between items-center p-3.5 bg-surface-container border border-outline-variant/60 rounded-lg text-xs">
+                <div className="flex items-center gap-2.5">
+                  <span className="material-symbols-outlined text-primary text-base">description</span>
+                  <div>
+                    <span className="font-bold text-on-surface">{doc.filename}</span>
+                    <span className="text-outline font-mono ml-2 text-[11px]">{doc.size}</span>
+                  </div>
+                </div>
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-tertiary-container/30 text-tertiary border border-tertiary/40">
+                  {doc.chunks} Chunks Indexed
+                </span>
+              </div>
+            ))
+          )}
         </div>
       </div>
 
@@ -101,20 +99,26 @@ export default function KnowledgeMemoryView({ activeSessionId = null }) {
         </form>
 
         <div className="flex flex-col gap-2.5">
-          {memoryFacts.map((fact) => (
-            <div key={fact.id} className="flex justify-between items-center p-3.5 bg-surface-container border border-outline-variant/60 rounded-lg text-xs">
-              <div className="flex items-center gap-2.5">
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-secondary-container/30 text-secondary border border-secondary/40">
-                  {fact.memory_type}
-                </span>
-                <span className="text-on-surface">{fact.text}</span>
-              </div>
-              <span className="text-[11px] text-tertiary font-bold font-mono flex items-center gap-1">
-                <span className="material-symbols-outlined text-xs">check</span>
-                <span>Verified</span>
-              </span>
+          {memoryFacts.length === 0 ? (
+            <div className="text-center p-4 text-xs text-on-surface-variant italic">
+              No persistent facts added yet.
             </div>
-          ))}
+          ) : (
+            memoryFacts.map((fact) => (
+              <div key={fact.id} className="flex justify-between items-center p-3.5 bg-surface-container border border-outline-variant/60 rounded-lg text-xs">
+                <div className="flex items-center gap-2.5">
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-secondary-container/30 text-secondary border border-secondary/40">
+                    {fact.memory_type}
+                  </span>
+                  <span className="text-on-surface">{fact.text}</span>
+                </div>
+                <span className="text-[11px] text-tertiary font-bold font-mono flex items-center gap-1">
+                  <span className="material-symbols-outlined text-xs">check</span>
+                  <span>Verified</span>
+                </span>
+              </div>
+            ))
+          )}
         </div>
       </div>
 

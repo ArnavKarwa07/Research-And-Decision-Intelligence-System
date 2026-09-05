@@ -2,6 +2,62 @@
 
 This document outlines database migration strategies and provides a roadmap for transitioning the Research And Decision Intelligence System (RADIS) from Phase 1 to Phase 12.
 
+## RADIS Decision Engine Overhaul Migration Notes
+
+### 1. Zero Breaking Changes & Backwards Compatibility
+- **Graph State Compatibility**: All existing state properties in `AgentState` remain fully backward-compatible. No state fields were removed or modified destructively.
+- **Database Schema**: Zero database migrations or table schema alterations are required for this overhaul. Active sessions, existing research checkpoints, and historical decision matrices continue to operate without schema updates.
+- **API Key & Configuration Resolution**: Existing `.env` configurations specifying `LLM_PROVIDER=gemini` automatically utilize `RotationalGeminiProvider` with rotational candidate list `["gemini-flash-latest", "gemini-flash-lite-latest", "gemini-1.5-flash", "gemma-2-27b-it", "gemma-2-9b-it"]`.
+
+### 2. Multi-Source Web Search Aggregation & Failover
+- **No Mandatory External API Keys**: `WebSearchTool` queries `ddgs` / `duckduckgo_search` library, DuckDuckGo Lite/HTML scrapers, Wikipedia REST API, and arXiv API out-of-the-box.
+- **Academic Capping & Source Interleaving**: Automatically caps arXiv results to $\le 2$ items and applies round-robin interleaving to preserve source diversity.
+- **News / Telemetry Fallbacks**: In environments where DuckDuckGo requests are rate-limited (HTTP 403/202), `WebSearchTool` automatically injects query-parameterized Google Scholar, Economic Times, Yahoo Finance, and BBC News results, ensuring zero empty searches.
+
+## Multi-Source Web Search Aggregator & Gemini LLM Alignment Migration Notes
+
+### 1. Environment Variable Updates (`.env`)
+
+To update backend deployment environments for the Multi-Source Web Search Aggregator and Google Gemini model alignment:
+
+1. **Gemini LLM Provider Model Alignment**:
+   Set `GEMINI_MODEL=gemini-flash-latest` in `backend/.env`:
+   ```ini
+   # LLM Provider Configuration
+   LLM_PROVIDER=gemini
+   GEMINI_MODEL=gemini-flash-latest
+   GEMINI_API_KEY=your_gemini_api_key_here
+   ```
+   *(Note: If `GEMINI_MODEL` is left unset, RADIS automatically defaults to `gemini-flash-latest` across all LLM calls).*
+
+2. **Unified Google & Gemini Search API Keys**:
+   If utilizing Google Custom Search Engine (CSE) alongside standard search tools, key resolution is unified in `backend/.env`:
+   ```ini
+   # Optional Google Search Credentials (Unified Resolution)
+   GOOGLE_SEARCH_API_KEY=your_google_search_api_key
+   GOOGLE_SEARCH_ENGINE_ID=your_google_search_engine_id
+   ```
+
+3. **Multi-Source Web Search Aggregator Settings**:
+   No mandatory API keys are required for basic operations. Out-of-the-box, [`WebSearchTool`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/tools/web_search.py) queries:
+   - **DuckDuckGo Lite / HTML scraper** (zero-key web/news results)
+   - **Wikipedia REST API** (zero-key entity lookup)
+   - **arXiv API** (zero-key academic literature)
+   - **Curated News & Financial Telemetry Fallbacks** (Google Scholar, Economic Times, Yahoo Finance, Reuters, MarketWatch, Bloomberg)
+
+   For optional paid search APIs, configure:
+   ```ini
+   # Optional Third-Party Web Search Providers
+   WEB_SEARCH_PROVIDER=duckduckgo # Options: duckduckgo, google, tavily, mock
+   TAVILY_API_KEY=your_tavily_api_key_here
+   ```
+
+### 2. Backward Compatibility & System Behavior
+
+- **Database Migrations**: No raw database schema migration is required for this update.
+- **Dynamic Synthesis**: Hardcoded template fallbacks and static corporate jargon options have been completely removed. Dynamic synthesis executes using live evidence streams and LLM context blocks.
+- **Zero-Downtime Migration**: Existing sessions, queries, and saved decisions will function seamlessly with updated model settings.
+
 ## Phase 12 Implemented Schema & Infrastructure Additions (Continuous Intelligence & Project Memory)
 
 Phase 12 introduces 6 new database tables for continuous research monitoring, baseline snapshots, job execution logs, decision alert notifications, persistent cross-session project memory, and domain-specific research heuristics.

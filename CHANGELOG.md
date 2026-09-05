@@ -5,6 +5,73 @@ All notable changes to the Research And Decision Intelligence System (RADIS) wil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] / [15.0.0] - RADIS Decision Engine Overhaul - 2026-09-05
+
+### Added (RADIS Decision Engine Overhaul)
+- **Rotational LLM Provider & Dynamic Error Failover (`RotationalGeminiProvider`, `RotationalChatGoogleGenerativeAI`)**:
+  - Implemented automatic model rotation across candidate list `["gemini-flash-latest", "gemini-flash-lite-latest", "gemini-1.5-flash", "gemma-2-27b-it", "gemma-2-9b-it"]` in [`llm_provider.py`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/agents/llm_provider.py) and [`graph.py`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/agents/graph.py).
+  - Handles API rate limits (HTTP 429), service unavailability (503), model missing errors (404), and quota exhaustion by dynamically failing over to the next candidate model without crashing research workflows.
+- **Multi-Source Web Search Aggregator & Source Balancing (`WebSearchTool`)**:
+  - Combined `ddgs` Python library, DuckDuckGo Lite/HTML scrapers, Wikipedia REST API, and arXiv API into a concurrent multi-source web intelligence aggregator in [`web_search.py`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/tools/web_search.py).
+  - Enforced source balancing rules: caps academic literature from arXiv at $\le 2$ items and applies round-robin interleaving across live web, news, Wikipedia, and arXiv items.
+  - Features query-parameterized news/market fallback sources (Google Scholar, Economic Times, Yahoo Finance, BBC News) when primary scrapers return zero results.
+- **Content-First Synthesis & Dynamic Snippet-Grounded Offline Fallbacks (`SynthesisAgent`)**:
+  - Upgraded [`synthesis.py`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/agents/synthesis.py) with content-first sentence extraction from verified claims and web snippets.
+  - Dynamically builds articulate, topic-grounded strategic recommendation options without mechanical title concatenation or static canned templates.
+- **Prompt Injection XML Shielding (`synthesis_node`, `graph.py`)**:
+  - Enforces `<retrieved_snippets>` XML boundary encapsulation around external web search snippets and RAG context blocks across all state machine graph nodes.
+- **Robust Decision Agent Matrix Processing (`DecisionAgent`)**:
+  - Enhanced [`decision.py`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/agents/decision.py) to automatically enrich missing criteria scores with neutral baseline values ($0.5$), preventing matrix calculation exceptions.
+
+## [1.1.0] - Multi-Source Web Search Aggregator & Gemini LLM Alignment - 2026-09-05
+
+### Added (Multi-Source Web Search Aggregator & Gemini Alignment)
+- **Multi-Source Web Search Aggregator ([`web_search.py`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/tools/web_search.py))**:
+  - Concurrent multi-source search pipeline gathering live web results across **DuckDuckGo Lite / HTML**, **Wikipedia REST API**, **arXiv API**, and curated **News/Market Fallbacks** (Google Scholar, Economic Times, Yahoo Finance, Reuters, MarketWatch, Bloomberg).
+  - Source distribution skew prevention: Guarantees balanced search result distribution across general live web news, encyclopedia context, academic literature, and financial telemetry without dropping general web/news sources when Wikipedia or arXiv return results.
+  - Automatic SSL fallback context creation and robust HTTP exception handling.
+- **Gemini LLM Provider Alignment (`gemini-flash-latest`)**:
+  - Direct alignment of Google Gemini provider configurations in [`app/config.py`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/config.py), [`llm_provider.py`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/agents/llm_provider.py), and [`graph.py`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/agents/graph.py) to `gemini-flash-latest`.
+  - Unified configuration parameter handling across `gemini_model`, `gemini_api_key`, `google_search_api_key`, and `google_search_engine_id`.
+- **Dynamic Report Synthesis & Decision Engine (`SynthesisAgent`, `synthesis_node`)**:
+  - Complete elimination of legacy static fallback template options, corporate jargon defaults, and hardcoded domain options (e.g., React/Next.js domain hardcoding).
+  - Dynamic generation of topic-grounded strategic recommendations, weighted alternative trade-off matrices, best/base/worst scenarios, and decision tripwires directly from live evidence streams.
+
+### Fixed (Bug Fixes BUG-01 through BUG-07)
+- **BUG-01 (CRITICAL - Source Distribution Skew & DDG Scraper Failure)**: Fixed DuckDuckGo Lite 202/403 automated request failures causing 100% arXiv/Wikipedia skew by decoupling fallback web/news injection and executing concurrent multi-source aggregation.
+- **BUG-02 (MINOR - Configuration Key Mismatch)**: Resolved configuration key name mismatch between [`config.py`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/config.py) (`google_search_api_key`, `google_search_engine_id`) and [`web_search.py`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/tools/web_search.py) (`GEMINI_API_KEY`, `GOOGLE_CX`) by unifying key lookup across environment variables and settings.
+- **BUG-03 (MAJOR - Structured LLM Generation Type Error)**: Fixed `MockProvider.generate_structured()` crashing when validating Pydantic models containing generic list annotations (`list[T]` / `List[T]`).
+- **BUG-04 (CRITICAL - Synthesis Node Array Index Out of Bounds)**: Resolved [`graph.py`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/agents/graph.py) `synthesis_node` crashing with `IndexError`/`KeyError` when LLM responses contained a single alternative option or non-standard key names by adding safety bounds checks.
+- **BUG-05 (MAJOR - Leftover Hardcoded Domain Templates)**: Removed leftover hardcoded React/Next.js domain templates from [`synthesis.py`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/agents/synthesis.py) in favor of fully dynamic LLM-driven synthesis.
+- **BUG-06 (MAJOR - Graph Architecture Stubbed Nodes)**: Replaced stubbed mock nodes in [`graph.py`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/agents/graph.py) (`retrieval_node`, `fact_check_node`, `contradiction_node`) with real live Qdrant vector store RAG, real claim verification, and contradiction detection.
+- **BUG-07 (MAJOR - Prompt Injection in Synthesis Node)**: Fixed prompt injection vulnerability in [`graph.py`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/agents/graph.py) `synthesis_node` by encapsulating untrusted external web search snippets in `<retrieved_snippets>` XML boundaries and applying strict injection sanitization.
+
+## [14.0.0] - Dynamic Orchestrator & Dynamic LLM Report Synthesis - 2026-09-05
+
+### Added (Dynamic Orchestrator & Dynamic LLM Report Synthesis)
+- **Dynamic Orchestrator-Subagent Graph Routing (`route_after_synthesis`, `route_after_decision`)**:
+  - `route_after_synthesis`: Dynamically evaluates research execution mode (`quick`, `deep`, `comprehensive`, `adversarial`). In `quick` mode, execution skips deep hypothesis decomposition, falsification, and red-team critic loops, routing straight from `synthesis` to `decision` for fast response times.
+  - `route_after_decision`: Dynamically inspects user intent and query context. Simple informational queries terminate cleanly at `__end__`, while quantitative queries (`sql`, `database`, `table`, `metrics`, `chart`, `sales`, `revenue`) conditionally trigger `data` and `visualization` nodes. Projects/sessions route to `memory`, and active monitoring jobs route to `monitoring`.
+  - Intent-Based Fast-Path Query Router (`query_service.py`): Automatically classifies user query intent and bypasses unnecessary subagent nodes when deep multi-agent RAG or falsification is not required.
+- **Complete Elimination of Canned Corporate Jargon Templates**:
+  - **Zero-Boilerplate Dynamic LLM Report Synthesis (`SynthesisAgent`, `synthesis_node`)**: Pruned legacy hardcoded fallback templates containing ungrounded corporate jargon (such as "Regional Buffer Architecture", "Lithography", "Fabrication lead times", or generic "Monolithic Execution vs Multi-Agent Parallel Runtime" defaults).
+  - **Context-Aware Dynamic LLM Prompting (`get_langchain_llm`)**: Modernized LLM synthesis integration using live Google Gemini / OpenAI providers with strict prompt guardrails ("DO NOT use generic corporate jargon... Tailor ALL recommendations directly to query topic"). Dynamically formats up to 6 verified evidence claims and raw RAG snippets into context blocks.
+  - **5-Section Executive Deep Research Report Format**:
+    1. Executive Summary & Core Strategic Recommendation (clear choice, confidence score, rationale)
+    2. In-Depth Operational & Technical Analysis (addressing query topic key dynamics, pros, cons)
+    3. Verified Evidence Trail & Fact-Checked Claims
+    4. Key Risks, Assumptions & Tipping Point Triggers
+    5. Actionable Implementation Roadmap (Phase 1 Immediate, Phase 2 Medium Term, Phase 3 Scale)
+  - **Topic-Grounded Strategic Alternatives**: Generates topic-tailored alternative options and weighted trade-off scores dynamically aligned with the user query (e.g. React vs Full-Stack options when the query focuses on React frontend development).
+- **Automated Anti-Jargon & Dynamic Routing Test Suite (`backend/tests/test_dynamic_synthesis_no_jargon.py`)**:
+  - Automated pytest test suite validating:
+    - Complete absence of canned corporate jargon across generated reports.
+    - Topic relevance of generated strategic alternatives.
+    - Dynamic graph routing correctness across execution modes and query intents.
+- **Frontend Response & Intent UI Enhancements (`ChatConversationView.jsx`, `QueryInput.jsx`, `App.jsx`, `DecisionAnalyticsView.jsx`, `KnowledgeMemoryView.jsx`)**:
+  - Unified response card view rendering dynamic executive research markdown reports with live stream telemetry.
+  - Plus menu integration, fast-path intent indicator badges, and streamlined input area with simplified action controls.
+
 ## [13.0.0] - Phase 13 Release - 2026-09-05
 
 ### Added (Phase 13 Enterprise Expansion)

@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.models.query import Query
+from app.models.session import Session
 from app.models.evidence import Evidence
 from app.models.agent_run import AgentRun
 from app.schemas.query import QueryCreate, QueryStatus
@@ -37,6 +38,15 @@ class QueryService:
             status='pending'
         )
         self.db.add(query)
+
+        # Auto-update session title to query text if title is default
+        session_res = await self.db.execute(select(Session).where(Session.id == session_id))
+        session = session_res.scalar_one_or_none()
+        if session and (not session.title or session.title == 'New Research Workspace'):
+            title_text = data.text[:40] + '...' if len(data.text) > 40 else data.text
+            session.title = f'Thread: "{title_text}"'
+            self.db.add(session)
+
         await self.db.commit()
         await self.db.refresh(query)
         return query
@@ -44,6 +54,12 @@ class QueryService:
     async def get_query(self, query_id: UUID) -> Query | None:
         result = await self.db.execute(select(Query).where(Query.id == query_id))
         return result.scalar_one_or_none()
+
+    async def get_session_queries(self, session_id: UUID) -> list[Query]:
+        result = await self.db.execute(
+            select(Query).where(Query.session_id == session_id).order_by(Query.created_at.asc())
+        )
+        return list(result.scalars().all())
 
     async def run_research(self, query_id: UUID, mode: str = "deep") -> None:
         """Executes research workflow via Fast-Path intent router or Phase 2 LangGraph multi-agent pipeline."""
@@ -181,6 +197,9 @@ class QueryService:
                 query.research_plan = {
                     "plan": final_state.get("plan", []),
                     "decision_matrix": final_state.get("decision_matrix"),
+                    "evidence": evidence_records,
+                    "claims": final_state.get("claims", []),
+                    "steps": final_state.get("steps", []),
                     "audit_passed": final_state.get("audit_passed", True),
                     "audit_issues": final_state.get("audit_issues", [])
                 }

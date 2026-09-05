@@ -9,6 +9,7 @@ from app.services.session_service import SessionService
 
 router = APIRouter(prefix='/sessions/{session_id}/queries', tags=['queries'])
 
+@router.post('', response_model=QueryResponse, status_code=status.HTTP_201_CREATED)
 @router.post('/', response_model=QueryResponse, status_code=status.HTTP_201_CREATED)
 async def create_query(
     session_id: UUID, 
@@ -29,6 +30,13 @@ async def create_query(
     background_tasks.add_task(query_service.run_research, query.id, data.mode)
     
     return query
+
+@router.get('', response_model=list[QueryResponse])
+@router.get('/', response_model=list[QueryResponse])
+async def list_session_queries(session_id: UUID, db: AsyncSession = Depends(get_db), settings = Depends(get_settings)):
+    """List all queries for a research session."""
+    query_service = QueryService(db, settings)
+    return await query_service.get_session_queries(session_id)
 
 @router.get('/{query_id}', response_model=QueryResponse)
 async def get_query(session_id: UUID, query_id: UUID, db: AsyncSession = Depends(get_db), settings = Depends(get_settings)):
