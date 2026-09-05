@@ -39,12 +39,14 @@ class QueryService:
         )
         self.db.add(query)
 
-        # Auto-update session title to query text if title is default
+        # Auto-update session title to query text if title is default and touch updated_at
         session_res = await self.db.execute(select(Session).where(Session.id == session_id))
         session = session_res.scalar_one_or_none()
-        if session and (not session.title or session.title == 'New Research Workspace'):
-            title_text = data.text[:40] + '...' if len(data.text) > 40 else data.text
-            session.title = f'Thread: "{title_text}"'
+        if session:
+            session.updated_at = datetime.utcnow()
+            if not session.title or session.title == 'New Research Workspace':
+                title_text = data.text[:40] + '...' if len(data.text) > 40 else data.text
+                session.title = f'Thread: "{title_text}"'
             self.db.add(session)
 
         await self.db.commit()
@@ -190,7 +192,7 @@ class QueryService:
                 summary_text = final_state.get("summary", "LangGraph investigation completed successfully.")
                 confidence_val = final_state.get("confidence", 0.94)
 
-                # Update Query status in DB
+                # Update Query status and touch session updated_at in DB
                 query.status = 'completed'
                 query.summary = summary_text
                 query.confidence = confidence_val
@@ -204,6 +206,13 @@ class QueryService:
                     "audit_issues": final_state.get("audit_issues", [])
                 }
                 db.add(query)
+
+                session_res = await db.execute(select(Session).where(Session.id == query.session_id))
+                parent_session = session_res.scalar_one_or_none()
+                if parent_session:
+                    parent_session.updated_at = datetime.utcnow()
+                    db.add(parent_session)
+
                 await db.commit()
                 await db.refresh(query)
 

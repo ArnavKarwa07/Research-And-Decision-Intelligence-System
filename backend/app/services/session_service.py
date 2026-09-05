@@ -35,12 +35,12 @@ class SessionService:
         return result.scalar_one_or_none()
 
     async def list_sessions(self, limit: int = 20, cursor: str | None = None) -> tuple[list[Session], int, str | None]:
-        query = select(Session).order_by(Session.created_at.desc())
+        query = select(Session).order_by(Session.updated_at.desc())
         
         if cursor:
             from datetime import datetime
             cursor_dt = datetime.fromisoformat(cursor)
-            query = query.where(Session.created_at < cursor_dt)
+            query = query.where(Session.updated_at < cursor_dt)
             
         query = query.limit(limit)
         
@@ -50,14 +50,16 @@ class SessionService:
         count_result = await self.db.execute(select(func.count()).select_from(Session))
         total_count = count_result.scalar_one()
         
-        next_cursor = sessions[-1].created_at.isoformat() if sessions else None
+        next_cursor = sessions[-1].updated_at.isoformat() if (sessions and sessions[-1].updated_at) else None
         
         return sessions, total_count, next_cursor
 
     async def update_session_status(self, session_id: UUID, status: str) -> Session | None:
         session = await self.get_session(session_id)
         if session:
+            from datetime import datetime
             session.status = status
+            session.updated_at = datetime.utcnow()
             await self.db.commit()
             await self.db.refresh(session)
         return session
@@ -65,7 +67,9 @@ class SessionService:
     async def update_session_title(self, session_id: UUID, title: str) -> Session | None:
         session = await self.get_session(session_id)
         if session:
+            from datetime import datetime
             session.title = title
+            session.updated_at = datetime.utcnow()
             await self.db.commit()
             await self.db.refresh(session)
         return session

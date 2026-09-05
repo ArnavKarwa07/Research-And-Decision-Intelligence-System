@@ -91,6 +91,11 @@ export default function App() {
       const newSession = await api.createSession({ title: 'New Research Workspace' });
       setSessions((prev) => [newSession, ...prev]);
       setActiveSessionId(newSession.id);
+      try {
+        localStorage.setItem('radis_active_session_id', newSession.id);
+      } catch (e) {
+        console.warn('Failed to save active session to localStorage:', e);
+      }
       resetWorkspace();
     } catch (e) {
       console.error('Failed to create session:', e);
@@ -102,10 +107,10 @@ export default function App() {
     try {
       const queries = await api.getSessionQueries(sessionId);
       if (queries && queries.length > 0) {
-        const completedQueries = queries.filter(q => q.research_plan);
+        const completedQueries = queries.filter(q => q.research_plan || q.status === 'completed');
         const targetQuery = completedQueries.length > 0 ? completedQueries[completedQueries.length - 1] : queries[queries.length - 1];
         setCurrentQuery(targetQuery);
-        if (targetQuery.research_plan) {
+        if (targetQuery && targetQuery.research_plan) {
           try {
             const parsed = typeof targetQuery.research_plan === 'string' ? JSON.parse(targetQuery.research_plan) : targetQuery.research_plan;
             if (parsed.decision_matrix) setDecisionMatrix(parsed.decision_matrix);
@@ -117,11 +122,13 @@ export default function App() {
             console.warn('Failed to parse saved research plan:', err);
           }
         }
+      } else {
+        resetWorkspace();
       }
     } catch (e) {
       console.warn('Failed to load session query history:', e);
     }
-  }, []);
+  }, [resetWorkspace]);
 
   useEffect(() => {
     if (!isInitialMountRef.current) return;
@@ -134,14 +141,27 @@ export default function App() {
         const fetchedSessions = res.items || [];
         if (fetchedSessions.length > 0) {
           setSessions(fetchedSessions);
-          const firstId = fetchedSessions[0].id;
-          setActiveSessionId(firstId);
-          loadSessionHistory(firstId);
+          let targetSession = fetchedSessions[0];
+          try {
+            const savedActiveId = localStorage.getItem('radis_active_session_id');
+            const matched = fetchedSessions.find((s) => s.id === savedActiveId);
+            if (matched) targetSession = matched;
+          } catch (e) {
+            console.warn('Failed to read activeSessionId from localStorage:', e);
+          }
+          setActiveSessionId(targetSession.id);
+          try {
+            localStorage.setItem('radis_active_session_id', targetSession.id);
+          } catch (e) {}
+          loadSessionHistory(targetSession.id);
         } else {
           api.createSession({ title: 'New Research Workspace' }).then((newSession) => {
             if (!isSubscribed) return;
             setSessions([newSession]);
             setActiveSessionId(newSession.id);
+            try {
+              localStorage.setItem('radis_active_session_id', newSession.id);
+            } catch (e) {}
           });
         }
       })
@@ -162,6 +182,9 @@ export default function App() {
       streamCleanupRef.current = null;
     }
     setActiveSessionId(id);
+    try {
+      localStorage.setItem('radis_active_session_id', id);
+    } catch (e) {}
     resetWorkspace();
     loadSessionHistory(id);
   };
@@ -177,9 +200,13 @@ export default function App() {
             streamCleanupRef.current();
             streamCleanupRef.current = null;
           }
-          setActiveSessionId(remaining[0].id);
+          const nextSession = remaining[0];
+          setActiveSessionId(nextSession.id);
+          try {
+            localStorage.setItem('radis_active_session_id', nextSession.id);
+          } catch (e) {}
           resetWorkspace();
-          loadSessionHistory(remaining[0].id);
+          loadSessionHistory(nextSession.id);
         } else {
           handleNewSession();
         }
@@ -219,7 +246,7 @@ export default function App() {
         console.warn('Failed to persist session title to backend:', e);
       });
       setSessions((prev) =>
-        prev.map((s) => (s.id === activeSessionId ? { ...s, title: formattedTitle } : s))
+        prev.map((s) => (s.id === activeSessionId ? { ...s, title: formattedTitle, updated_at: new Date().toISOString() } : s))
       );
 
       const cleanup = connectToStream(queryRes.id, {
@@ -240,6 +267,7 @@ export default function App() {
           if (data.decision_matrix) setDecisionMatrix(data.decision_matrix);
           if (data.plan) setPlan(data.plan);
           if (data.evidence) setEvidence(data.evidence);
+          loadSessionHistory(activeSessionId);
         },
         onError: (err) => {
           console.error('Stream error:', err);
