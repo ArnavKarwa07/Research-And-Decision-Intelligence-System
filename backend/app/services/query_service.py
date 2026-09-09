@@ -1,6 +1,6 @@
 from uuid import UUID
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -43,7 +43,7 @@ class QueryService:
         session_res = await self.db.execute(select(Session).where(Session.id == session_id))
         session = session_res.scalar_one_or_none()
         if session:
-            session.updated_at = datetime.utcnow()
+            session.updated_at = datetime.now(timezone.utc)
             if not session.title or session.title == 'New Research Workspace':
                 title_text = data.text[:40] + '...' if len(data.text) > 40 else data.text
                 session.title = f'Thread: "{title_text}"'
@@ -107,6 +107,13 @@ class QueryService:
                 query.confidence = 0.98
                 query.research_plan = {"decision_matrix": fast_matrix, "fast_path": True}
                 db.add(query)
+
+                session_res = await db.execute(select(Session).where(Session.id == query.session_id))
+                parent_session = session_res.scalar_one_or_none()
+                if parent_session:
+                    parent_session.updated_at = datetime.now(timezone.utc)
+                    db.add(parent_session)
+
                 await db.commit()
 
                 # Publish step and complete events over SSE
@@ -152,11 +159,10 @@ class QueryService:
                         logger.info(f"[LangGraph Stream] Node completed: '{node_name}'")
                         final_state.update(node_state)
                         
-                        # Publish latest step to SSE clients
+                        # Save AgentRun record and update research_plan incrementally
                         if node_state.get("steps"):
                             latest_step = node_state["steps"][-1]
                             
-                            # Save AgentRun record to DB
                             agent_run = AgentRun(
                                 query_id=query.id,
                                 agent_type=latest_step.get("agent_type", node_name),
@@ -167,7 +173,6 @@ class QueryService:
                                 execution_log=latest_step
                             )
                             db.add(agent_run)
-                            await db.commit()
 
                             step_event = StreamEvent(
                                 event_type="step",
@@ -175,6 +180,23 @@ class QueryService:
                                 timestamp=datetime.now()
                             )
                             stream_service.publish(query.id, step_event)
+
+                        # Incremental DB Persistence on every node execution
+                        query.research_plan = {
+                            "plan": final_state.get("plan", []),
+                            "decision_matrix": final_state.get("decision_matrix"),
+                            "evidence": final_state.get("claims", []),
+                            "claims": final_state.get("claims", []),
+                            "steps": final_state.get("steps", []),
+                            "audit_passed": final_state.get("audit_passed", True),
+                            "audit_issues": final_state.get("audit_issues", [])
+                        }
+                        if final_state.get("summary"):
+                            query.summary = final_state["summary"]
+                        if final_state.get("confidence"):
+                            query.confidence = final_state["confidence"]
+                        db.add(query)
+                        await db.commit()
                             
                 # Persist collected evidence/claims in Database
                 collected_claims = final_state.get("claims", [])
@@ -210,7 +232,7 @@ class QueryService:
                 session_res = await db.execute(select(Session).where(Session.id == query.session_id))
                 parent_session = session_res.scalar_one_or_none()
                 if parent_session:
-                    parent_session.updated_at = datetime.utcnow()
+                    parent_session.updated_at = datetime.now(timezone.utc)
                     db.add(parent_session)
 
                 await db.commit()
@@ -235,6 +257,15 @@ class QueryService:
             except Exception as e:
                 logger.error(f"LangGraph workflow execution error for query {query.id}: {e}", exc_info=True)
                 query.status = 'failed'
+                query.research_plan = {
+                    "plan": final_state.get("plan", []),
+                    "decision_matrix": final_state.get("decision_matrix"),
+                    "evidence": final_state.get("claims", []),
+                    "claims": final_state.get("claims", []),
+                    "steps": final_state.get("steps", []),
+                    "audit_passed": final_state.get("audit_passed", True),
+                    "audit_issues": final_state.get("audit_issues", [])
+                }
                 db.add(query)
                 await db.commit()
                 

@@ -167,12 +167,12 @@ def compare_options(
 
     recommendation = scored_alternatives[0]["name"] if scored_alternatives else ""
 
-    # Calculate confidence based on margin of victory between top 1 and top 2
+    # Calculate confidence as victory margin between top alternative and runner-up
     if len(scored_alternatives) >= 2:
         margin = scored_alternatives[0]["weighted_score"] - scored_alternatives[1]["weighted_score"]
-        confidence = round(max(0.0, margin), 4)
+        confidence = round(max(0.0, min(1.0, margin)), 4)
     else:
-        confidence = 1.0
+        confidence = 1.0 if scored_alternatives else 0.0
 
     return {
         "ranked_alternatives": scored_alternatives,

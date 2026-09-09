@@ -41,15 +41,15 @@ class CriticAgent(BaseAgent):
         
         # Parse inputs
         if isinstance(input_data, CriticInput):
-            synthesis = input_data.synthesis
-            claims = input_data.claims
-            evidence_chain = input_data.evidence_chain
+            synthesis = input_data.synthesis or ""
+            claims = input_data.claims or []
+            evidence_chain = input_data.evidence_chain or []
             hypotheses = input_data.hypotheses or []
         else:
-            synthesis = input_data.get("synthesis", input_data.get("synthesis_summary", ""))
-            claims = input_data.get("claims", [])
-            evidence_chain = input_data.get("evidence_chain", [])
-            hypotheses = input_data.get("hypotheses", [])
+            synthesis = input_data.get("synthesis") or input_data.get("synthesis_summary") or ""
+            claims = input_data.get("claims") or []
+            evidence_chain = input_data.get("evidence_chain") or []
+            hypotheses = input_data.get("hypotheses") or []
 
         self.synthesis_snapshot = synthesis
         tokens_used = 150
@@ -102,7 +102,8 @@ class CriticAgent(BaseAgent):
         for idx, claim in enumerate(claims):
             c_dict = claim if isinstance(claim, dict) else claim.model_dump() if hasattr(claim, "model_dump") else {}
             claim_id = str(c_dict.get("id", c_dict.get("claim_id", f"claim-{idx+1}")))
-            conf = float(c_dict.get("confidence", 1.0))
+            raw_conf = c_dict.get("confidence")
+            conf = float(raw_conf) if raw_conf is not None else 1.0
             status = str(c_dict.get("support_status", c_dict.get("status", "SUPPORTED"))).upper()
             
             # Sources extraction
@@ -110,16 +111,29 @@ class CriticAgent(BaseAgent):
             source_url = c_dict.get("source_url")
             sources_count = len(sources) if sources else (1 if source_url else 0)
 
-            # Check 1: Single Source
-            if sources_count == 1:
+            # Check 1: Single Source (do not flag if source is authoritative or claim confidence >= 0.70)
+            source_data = c_dict.get("source", {})
+            quality = "MEDIUM"
+            if isinstance(source_data, dict):
+                quality = source_data.get("qualityScore", source_data.get("quality_score", "MEDIUM"))
+            elif hasattr(source_data, "qualityScore"):
+                quality = getattr(source_data, "qualityScore", "MEDIUM")
+
+            is_authoritative = (
+                quality in ("HIGH", "AUTHORITATIVE")
+                or (isinstance(source_data, dict) and source_data.get("credibility_score", 0) >= 0.80)
+                or conf >= 0.70
+            )
+
+            if sources_count == 1 and not is_authoritative:
                 self.weak_evidence.append({
                     "claim_id": claim_id,
                     "reason": "SINGLE_SOURCE",
-                    "severity": "MEDIUM" if conf >= 0.70 else "HIGH",
-                    "details": f"Claim '{claim_id}' relies on only 1 source.",
+                    "severity": "LOW",
+                    "details": f"Claim '{claim_id}' relies on a single non-authoritative source with confidence < 0.70.",
                     "remediation": "Gather secondary independent sources to verify claim."
                 })
-                self.findings.append(f"Evidence Quality Issue: Claim {claim_id} depends on single source.")
+                self.findings.append(f"Evidence Quality Note: Claim {claim_id} depends on a single non-authoritative source.")
 
             # Check 2: Low Confidence (< 0.60)
             if conf < 0.60:
@@ -145,7 +159,7 @@ class CriticAgent(BaseAgent):
                 self.findings.append(f"Evidence Quality Issue: Claim {claim_id} is unverified ({status}).")
 
     def _audit_logical_coherence(self, synthesis: str, claims: List[Any]) -> None:
-        """Audits logical soundness, unstated assumptions, and inferences."""
+        """Audits logical soundness, unstated assumptions, XML shielding, and boilerplate jargon."""
         if not claims and synthesis:
             self.findings.append("Logical Coherence Warning: Synthesis produced without structured atomic claims.")
             self.missing_variables.append({
@@ -155,21 +169,60 @@ class CriticAgent(BaseAgent):
                 "suggested_action": "Extract atomic claims from synthesis for formal verification."
             })
         
+        # Check for unshielded raw XML tag leakage in synthesis
+        if "<retrieved_snippets>" in synthesis or "<extracted_claims>" in synthesis:
+            self.findings.append("Red-Team Alert: Raw XML prompt tags leaked into synthesis output.")
+            self.weak_evidence.append({
+                "claim_id": "SYNTHESIS-TAG-LEAK",
+                "reason": "XML_PROMPT_LEAK",
+                "severity": "HIGH",
+                "details": "Synthesis output contains raw internal XML context tags (<retrieved_snippets> or <extracted_claims>).",
+                "remediation": "Enforce XML tag stripping before presenting output."
+            })
+
+        # Check for generic boilerplate jargon
+        boilerplate_jargon = [
+            "regional buffer architecture",
+            "supply chain optimization",
+            "integrated primary framework",
+            "phased modular deployment"
+        ]
+        synth_lower = synthesis.lower()
+        for jargon in boilerplate_jargon:
+            if jargon in synth_lower:
+                self.findings.append(f"Boilerplate Jargon Leak: Synthesis contains generic non-domain string '{jargon}'.")
+                self.missing_variables.append({
+                    "variable": f"domain_specificity_{jargon.replace(' ', '_')}",
+                    "impact": "MEDIUM",
+                    "category": "GENERIC_JARGON",
+                    "suggested_action": "Replace generic boilerplate title with specific domain terminology."
+                })
+
         # Check for synthesis contradictory signals or weak conclusions
         if "however" in synthesis.lower() and "unclear" in synthesis.lower():
             self.findings.append("Logical Coherence Note: Synthesis notes unresolved ambiguity or friction.")
 
     def _audit_completeness(self, synthesis: str, claims: List[Any], hypotheses: List[Any]) -> None:
-        """Detects omitted factors, unstated assumptions, and missing variables."""
+        """Detects omitted factors, unstated assumptions, missing variables, and missing confidence anchors."""
         synth_lower = synthesis.lower()
         
+        # Verify confidence score anchor presence
+        if "confidence" not in synth_lower:
+            self.missing_variables.append({
+                "variable": "explicit_confidence_score",
+                "impact": "HIGH",
+                "category": "MISSING_CONFIDENCE",
+                "suggested_action": "Incorporate explicit numerical confidence score in executive summary."
+            })
+            self.findings.append("Completeness Gap: Missing explicit confidence score in synthesis.")
+
         # Key domain factors to audit
         key_factors = [
-            ("financial_cost", ["cost", "budget", "price", "financial", "roi"], "MEDIUM"),
+            ("financial_cost", ["cost", "budget", "price", "financial", "roi", "capex", "opex"], "MEDIUM"),
             ("regulatory_compliance", ["regulatory", "legal", "compliance", "policy"], "HIGH"),
-            ("scalability_limits", ["scale", "performance", "capacity", "limit"], "MEDIUM"),
-            ("temporal_validity", ["timeline", "duration", "obsolete", "current"], "MEDIUM"),
-            ("risk_mitigation", ["risk", "mitigation", "contingency", "fallback"], "HIGH"),
+            ("scalability_limits", ["scale", "performance", "capacity", "limit", "latency"], "MEDIUM"),
+            ("temporal_validity", ["timeline", "duration", "obsolete", "current", "roadmap", "horizon"], "MEDIUM"),
+            ("risk_mitigation", ["risk", "mitigation", "contingency", "fallback", "tipping"], "HIGH"),
         ]
 
         for factor_name, keywords, impact in key_factors:
@@ -185,7 +238,11 @@ class CriticAgent(BaseAgent):
 
     def _audit_bias(self, synthesis: str, claims: List[Any]) -> None:
         """Audits confirmation and framing bias."""
-        supported_count = sum(1 for c in claims if isinstance(c, dict) and c.get("support_status") == "SUPPORTED")
+        supported_count = 0
+        for c in claims:
+            c_dict = c if isinstance(c, dict) else c.model_dump() if hasattr(c, "model_dump") else {}
+            if c_dict.get("support_status") == "SUPPORTED":
+                supported_count += 1
         total_count = len(claims)
 
         if total_count >= 3 and supported_count == total_count:
@@ -220,14 +277,17 @@ class CriticAgent(BaseAgent):
 
     async def _invoke_llm_enhancement(self, synthesis: str, claims: List[Any]) -> Dict[str, Any]:
         """Optional LLM structured call for deeper qualitative criticism."""
+        from app.agents.llm_provider import Message
         prompt = (
             f"Perform a red-team review of the following synthesis:\n{synthesis}\n"
             f"Claims count: {len(claims)}\n"
             "Identify any critical hidden assumptions, unstated risks, or omitted variables."
         )
         if hasattr(self._llm_provider, "generate"):
-            res = await self._llm_provider.generate(prompt)
-            return {"tokens_used": 250, "text": res}
+            res = await self._llm_provider.generate([Message(role="user", content=prompt)])
+            text_val = getattr(res, "content", str(res))
+            tokens = getattr(res, "tokens_used", 250)
+            return {"tokens_used": tokens, "text": text_val}
         return {"tokens_used": 0}
 
     async def compile_output(self) -> Dict[str, Any]:

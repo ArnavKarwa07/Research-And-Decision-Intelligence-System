@@ -3,6 +3,7 @@ from pydantic import BaseModel
 import httpx
 import logging
 import os
+import re
 import urllib.parse
 from bs4 import BeautifulSoup
 from typing import Any
@@ -27,7 +28,7 @@ class WebSearchTool:
     """Pluggable web search tool supporting DuckDuckGo, Google CSE, and Tavily."""
     
     def __init__(self, provider: str = 'duckduckgo', **config: Any):
-        self.provider = provider
+        self.provider = os.environ.get("SEARCH_PROVIDER") or getattr(settings, "search_provider", provider)
         self.config = config
         self.tavily_api_key = os.environ.get("TAVILY_API_KEY") or getattr(settings, "tavily_api_key", "")
         self.GEMINI_API_KEY = (
@@ -45,12 +46,10 @@ class WebSearchTool:
         logger.info(f"Initialized WebSearchTool with provider: {provider}")
 
     async def search(self, input_data: WebSearchInput) -> list[WebSearchResult]:
-        """Route to appropriate search backend with multi-source aggregator."""
-        logger.debug(f"Searching web for: {input_data.query} via {self.provider}")
-        
-    async def search(self, input_data: WebSearchInput) -> list[WebSearchResult]:
-        """Route to appropriate search backend with multi-source aggregator."""
-        logger.debug(f"Searching web for: {input_data.query} via {self.provider}")
+        """Route to appropriate search backend with relevance-based multi-source aggregator."""
+        query_text = (input_data.query or "").strip()
+        input_data = WebSearchInput(query=query_text, num_results=input_data.num_results)
+        logger.debug(f"Searching web for: {query_text} via {self.provider}")
         
         if self.provider in ('duckduckgo', 'mock'):
             primary_task = self._duckduckgo_search(input_data)
@@ -67,7 +66,7 @@ class WebSearchTool:
         res = await asyncio.gather(primary_task, wiki_task, arxiv_task, return_exceptions=True)
 
         if isinstance(res[0], Exception):
-            logger.warning(f"Primary search backend ({self.provider}) error for '{input_data.query}': {res[0]}")
+            logger.warning(f"Primary search backend ({self.provider}) error for '{query_text}': {res[0]}")
             primary_results = []
         else:
             primary_results = res[0] if isinstance(res[0], list) else []
@@ -75,64 +74,94 @@ class WebSearchTool:
         wiki_results: list[WebSearchResult] = res[1] if isinstance(res[1], list) else []
         arxiv_results: list[WebSearchResult] = res[2] if isinstance(res[2], list) else []
 
-        # Prepare web pool (primary results or fallbacks if primary returns 0 results)
-        web_pool: list[WebSearchResult] = list(primary_results)
-        if len(web_pool) == 0:
-            encoded_q = urllib.parse.quote(input_data.query.strip())
-            web_pool = [
+        # Pool all candidate results together into a single list
+        raw_candidates: list[WebSearchResult] = []
+        raw_candidates.extend(primary_results)
+        raw_candidates.extend(wiki_results)
+        raw_candidates.extend(arxiv_results)
+
+        # Deduplicate results by normalized URL
+        seen_urls: set[str] = set()
+        deduped_candidates: list[WebSearchResult] = []
+
+        for r in raw_candidates:
+            norm_url = (r.url or "").strip().lower().rstrip('/')
+            if norm_url and norm_url not in seen_urls:
+                seen_urls.add(norm_url)
+                deduped_candidates.append(r)
+
+        # If zero live candidate results are returned, replace with query-tailored live search URLs
+        if not deduped_candidates:
+            encoded_q = urllib.parse.quote(query_text)
+            deduped_candidates = [
                 WebSearchResult(
-                    url=f"https://scholar.google.com/scholar?q={encoded_q}",
-                    title=f"Google Scholar Research: {input_data.query[:45]}",
-                    snippet=f"Peer-reviewed academic research papers and literature citations for '{input_data.query}'.",
+                    url=f"https://duckduckgo.com/?q={encoded_q}",
+                    title=f"DuckDuckGo Live Search: {query_text[:45]}",
+                    snippet=f"Live web search index results for '{query_text}'.",
                     rank=1
                 ),
                 WebSearchResult(
-                    url=f"https://economictimes.indiatimes.com/search.cms?query={encoded_q}",
-                    title=f"Economic Times Markets & Industry: {input_data.query[:45]}",
-                    snippet=f"Primary financial market coverage and macroeconomic trade reporting for '{input_data.query}'.",
+                    url=f"https://en.wikipedia.org/wiki/Special:Search?search={encoded_q}",
+                    title=f"Wikipedia Reference Search: {query_text[:45]}",
+                    snippet=f"Knowledge base and encyclopedia articles for '{query_text}'.",
                     rank=2
                 ),
                 WebSearchResult(
-                    url=f"https://finance.yahoo.com/lookup?s={encoded_q}",
-                    title=f"Yahoo Finance Market Telemetry: {input_data.query[:45]}",
-                    snippet=f"Real-time financial telemetry, market data, and sector analytics for '{input_data.query}'.",
+                    url=f"https://arxiv.org/search/?query={encoded_q}&searchtype=all",
+                    title=f"arXiv Academic Research: {query_text[:45]}",
+                    snippet=f"Scientific preprints and research papers for '{query_text}'.",
                     rank=3
                 ),
                 WebSearchResult(
-                    url=f"https://www.bbc.co.uk/search?q={encoded_q}",
-                    title=f"BBC News World Intelligence: {input_data.query[:45]}",
-                    snippet=f"Global news coverage, geopolitical analysis, and regulatory reporting for '{input_data.query}'.",
+                    url=f"https://scholar.google.com/scholar?q={encoded_q}",
+                    title=f"Google Scholar Citations: {query_text[:45]}",
+                    snippet=f"Peer-reviewed academic research papers for '{query_text}'.",
                     rank=4
                 )
             ]
 
-        # Limit arXiv to <= 2 items
-        arxiv_capped = arxiv_results[:2]
+        # Calculate a relevance score for each candidate result based on query term overlap with title and snippet
+        def _calc_relevance(item: WebSearchResult) -> tuple[float, int, int]:
+            q_lower = query_text.lower()
+            words = [w for w in re.findall(r'\w+', q_lower) if len(w) > 1]
+            item_title = item.title or ""
+            item_snippet = item.snippet or ""
+            title_lower = item_title.lower()
+            snippet_lower = item_snippet.lower()
 
-        # Interleave Web, Wikipedia, and arXiv results round-robin to ensure diverse source distribution
-        combined: list[WebSearchResult] = []
-        seen_urls: set[str] = set()
+            if not words:
+                return (0.0, len(item_snippet.strip()), len(item_title.strip()))
 
-        def add_result(r: WebSearchResult):
-            norm_url = r.url.strip().lower().rstrip('/')
-            if norm_url not in seen_urls:
-                seen_urls.add(norm_url)
-                combined.append(r)
+            title_matches = sum(1 for w in words if w in title_lower)
+            snippet_matches = sum(1 for w in words if w in snippet_lower)
 
-        source_queues = [list(web_pool), list(wiki_results), list(arxiv_capped)]
-        while any(source_queues):
-            for q in source_queues:
-                if q:
-                    item = q.pop(0)
-                    add_result(item)
+            title_score = title_matches / len(words)
+            snippet_score = snippet_matches / len(words)
 
-        # Re-rank results up to input_data.num_results
+            score = (title_score * 3.0) + (snippet_score * 1.5)
+
+            if q_lower in title_lower:
+                score += 2.0
+            if q_lower in snippet_lower:
+                score += 1.0
+
+            if len(item_snippet.strip()) > 30:
+                score += 0.5
+            if len(item_title.strip()) > 5:
+                score += 0.5
+
+            return (score, len(item_snippet.strip()), len(item_title.strip()))
+
+        # Sort candidate results by relevance score descending (and title/snippet quality as tie-breakers)
+        sorted_candidates = sorted(deduped_candidates, key=_calc_relevance, reverse=True)
+
+        # Select top input_data.num_results items based on relevance
         final_results = []
-        for idx, item in enumerate(combined[:input_data.num_results]):
+        for idx, item in enumerate(sorted_candidates[:input_data.num_results]):
             final_results.append(WebSearchResult(
-                url=item.url,
-                title=item.title,
-                snippet=item.snippet,
+                url=item.url or "",
+                title=item.title or "",
+                snippet=item.snippet or "",
                 rank=idx + 1
             ))
 
@@ -337,9 +366,9 @@ class WebSearchTool:
             results = []
             for i, item in enumerate(data.get("items", [])):
                 results.append(WebSearchResult(
-                    url=item.get("link", ""),
-                    title=item.get("title", ""),
-                    snippet=item.get("snippet", ""),
+                    url=item.get("link") or "",
+                    title=item.get("title") or "",
+                    snippet=item.get("snippet") or "",
                     rank=i+1
                 ))
             return results
@@ -365,9 +394,9 @@ class WebSearchTool:
             results = []
             for i, item in enumerate(data.get("results", [])):
                 results.append(WebSearchResult(
-                    url=item.get("url", ""),
-                    title=item.get("title", ""),
-                    snippet=item.get("content", ""),
+                    url=item.get("url") or "",
+                    title=item.get("title") or "",
+                    snippet=item.get("content") or item.get("snippet") or "",
                     rank=i+1
                 ))
             return results

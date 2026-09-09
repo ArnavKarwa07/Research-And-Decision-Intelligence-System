@@ -70,6 +70,33 @@ class MockProvider(LLMProvider):
                     fields[k] = None
             return response_schema(**fields)
 
+def extract_text_content(content: Any) -> str:
+    """Extract clean string content from LLM output (handles str, list of dicts, or objects)."""
+    if content is None:
+        return ""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = []
+        for part in content:
+            if isinstance(part, str):
+                parts.append(part)
+            elif isinstance(part, dict):
+                val = part.get("text") or part.get("content") or ""
+                if val:
+                    parts.append(str(val))
+            elif hasattr(part, "text"):
+                val = getattr(part, "text", "")
+                if val:
+                    parts.append(str(val))
+        if parts:
+            return "\n".join(parts)
+        return str(content)
+    if isinstance(content, dict):
+        return str(content.get("text") or content.get("content") or str(content))
+    return str(content)
+
+
 class GeminiProvider(LLMProvider):
     """
     Google Gemini provider using ChatGoogleGenerativeAI from langchain_google_genai.
@@ -111,7 +138,7 @@ class GeminiProvider(LLMProvider):
             lc_messages = self._convert_messages(messages)
             res = await self.llm.ainvoke(lc_messages)
             
-            content = res.content if isinstance(res.content, str) else str(res.content)
+            content = extract_text_content(res.content)
             usage = 0
             if hasattr(res, 'usage_metadata') and res.usage_metadata:
                 usage = res.usage_metadata.get('total_tokens', 0)
@@ -151,11 +178,11 @@ class RotationalGeminiProvider(LLMProvider):
     Rotational Gemini provider that iterates over candidate models on API errors, rate limits, or unsupported model errors.
     """
     CANDIDATE_MODELS = [
+        "gemini-3.6-flash",
         "gemini-flash-latest",
         "gemini-flash-lite-latest",
+        "gemini-2.5-flash",
         "gemini-1.5-flash",
-        "gemma-2-27b-it",
-        "gemma-2-9b-it",
     ]
 
     def __init__(self, api_key: str | None = None, candidate_models: list[str] | None = None):
@@ -164,12 +191,16 @@ class RotationalGeminiProvider(LLMProvider):
         self.current_index = 0
 
     def _is_rotatable_error(self, exc: Exception) -> bool:
-        rotatable_types = []
+        root_exc = getattr(exc, "__cause__", None) or getattr(exc, "__context__", None) or exc
+        if isinstance(root_exc, (NotImplementedError, AttributeError)):
+            return True
+
+        rotatable_types: list[type[BaseException]] = [NotImplementedError, AttributeError]
         try:
             from google.api_core.exceptions import (
-                GoogleAPICallError, ResourceExhausted, ServiceUnavailable, NotFound, InvalidArgument
+                GoogleAPICallError, ResourceExhausted, ServiceUnavailable, NotFound, InvalidArgument, InternalServerError, DeadlineExceeded
             )
-            rotatable_types.extend([GoogleAPICallError, ResourceExhausted, ServiceUnavailable, NotFound, InvalidArgument])
+            rotatable_types.extend([GoogleAPICallError, ResourceExhausted, ServiceUnavailable, NotFound, InvalidArgument, InternalServerError, DeadlineExceeded])
         except ImportError:
             pass
         try:
@@ -179,19 +210,19 @@ class RotationalGeminiProvider(LLMProvider):
             pass
         try:
             import httpx
-            rotatable_types.extend([httpx.HTTPError, httpx.HTTPStatusError])
+            rotatable_types.extend([httpx.HTTPError, httpx.HTTPStatusError, httpx.TimeoutException])
         except ImportError:
             pass
 
-        if rotatable_types and isinstance(exc, tuple(rotatable_types)):
+        if rotatable_types and (isinstance(exc, tuple(rotatable_types)) or isinstance(root_exc, tuple(rotatable_types))):
             return True
 
-        err_msg = str(exc).lower()
-        exc_type = type(exc).__name__.lower()
+        err_msg = (str(exc) + " " + str(root_exc)).lower()
+        exc_type = (type(exc).__name__ + " " + type(root_exc).__name__).lower()
         keywords = [
-            "429", "503", "404", "400",
+            "429", "503", "500", "502", "504", "404", "400",
             "resource_exhausted", "quota", "not found", "invalid argument",
-            "rate limit", "overloaded"
+            "rate limit", "overloaded", "timeout", "deadline", "internal"
         ]
         if any(kw in err_msg for kw in keywords) or any(kw in exc_type for kw in keywords):
             return True

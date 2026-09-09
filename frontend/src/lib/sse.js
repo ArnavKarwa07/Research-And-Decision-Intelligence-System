@@ -1,4 +1,22 @@
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api/v1';
+const BASE_URL = import.meta.env.VITE_API_URL || '/api/v1';
+
+const formatMsg = (val) => (typeof val === 'object' && val !== null ? JSON.stringify(val) : String(val));
+
+const parseErrorData = (event) => {
+  if (!event) return { message: 'Stream connection interrupted.' };
+  if (typeof event === 'string') return { message: event };
+  if (event.message) return { message: formatMsg(event.message) };
+  if (event.data) {
+    try {
+      const parsed = JSON.parse(event.data);
+      const msg = parsed.message || parsed.detail || event.data;
+      return { message: formatMsg(msg) };
+    } catch (e) {
+      return { message: formatMsg(event.data) };
+    }
+  }
+  return { message: 'Stream connection interrupted.' };
+};
 
 export function connectToStream(queryId, handlers) {
   const url = `${BASE_URL}/queries/${queryId}/stream`;
@@ -9,17 +27,54 @@ export function connectToStream(queryId, handlers) {
     try {
       const parsed = JSON.parse(event.data);
       const data = parsed.data || parsed;
-      if (handlers.onStep && (parsed.event === 'step' || data.event_type === 'step')) {
-        handlers.onStep(data);
-      } else if (handlers.onComplete && (parsed.event === 'complete' || data.event_type === 'complete')) {
+      const eventType = parsed.event_type || parsed.event || data.event_type;
+      if (eventType === 'error' && handlers.onError) {
         isClosed = true;
-        handlers.onComplete(data);
-        eventSource.close();
+        try {
+          handlers.onError(parseErrorData(event));
+        } finally {
+          eventSource.close();
+        }
+      } else if (handlers.onStep && eventType === 'step') {
+        handlers.onStep(data);
+      } else if (handlers.onEvidence && eventType === 'evidence') {
+        handlers.onEvidence(data);
+      } else if (handlers.onClaim && eventType === 'claim') {
+        handlers.onClaim(data);
+      } else if (handlers.onDecision && eventType === 'decision') {
+        handlers.onDecision(data);
+      } else if (handlers.onComplete && eventType === 'complete') {
+        isClosed = true;
+        try {
+          handlers.onComplete(data);
+        } finally {
+          eventSource.close();
+        }
       }
     } catch (err) {
       console.error('Failed to parse SSE event:', err);
     }
   };
+
+  eventSource.addEventListener('evidence', (event) => {
+    try {
+      const parsed = JSON.parse(event.data);
+      const data = parsed.data || parsed;
+      if (handlers.onEvidence) handlers.onEvidence(data);
+    } catch (e) {
+      console.error(e);
+    }
+  });
+
+  eventSource.addEventListener('claim', (event) => {
+    try {
+      const parsed = JSON.parse(event.data);
+      const data = parsed.data || parsed;
+      if (handlers.onClaim) handlers.onClaim(data);
+    } catch (e) {
+      console.error(e);
+    }
+  });
 
   eventSource.addEventListener('step', (event) => {
     try {
@@ -42,14 +97,27 @@ export function connectToStream(queryId, handlers) {
   });
 
   eventSource.addEventListener('complete', (event) => {
+    isClosed = true;
     try {
-      isClosed = true;
       const parsed = JSON.parse(event.data);
       const data = parsed.data || parsed;
       if (handlers.onComplete) handlers.onComplete(data);
-      eventSource.close();
     } catch (e) {
       console.error(e);
+    } finally {
+      eventSource.close();
+    }
+  });
+
+  eventSource.addEventListener('error', (event) => {
+    if (isClosed) return;
+    isClosed = true;
+    try {
+      if (handlers.onError) {
+        handlers.onError(parseErrorData(event));
+      }
+    } finally {
+      eventSource.close();
     }
   });
 
@@ -72,13 +140,14 @@ export function connectToStream(queryId, handlers) {
   });
 
   eventSource.onerror = (err) => {
-    if (isClosed || eventSource.readyState === EventSource.CLOSED || eventSource.readyState === EventSource.CONNECTING) {
-      return;
-    }
+    if (isClosed) return;
     isClosed = true;
-    eventSource.close();
-    if (handlers.onError) {
-      handlers.onError(err);
+    try {
+      if (handlers.onError) {
+        handlers.onError(parseErrorData(err));
+      }
+    } finally {
+      eventSource.close();
     }
   };
 

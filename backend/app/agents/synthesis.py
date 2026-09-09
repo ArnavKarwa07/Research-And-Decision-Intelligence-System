@@ -105,8 +105,9 @@ class SynthesisAgent(BaseAgent):
         raw_items = (claims or []) + (raw_sources or [])
         for item in raw_items:
             content = ""
-            if isinstance(item, dict):
-                content = item.get("snippet") or item.get("content") or item.get("title") or ""
+            item_dict = item.model_dump() if hasattr(item, "model_dump") else item if isinstance(item, dict) else {}
+            if item_dict and isinstance(item_dict, dict):
+                content = item_dict.get("snippet") or item_dict.get("content") or item_dict.get("title") or ""
             elif isinstance(item, str):
                 content = item
             else:

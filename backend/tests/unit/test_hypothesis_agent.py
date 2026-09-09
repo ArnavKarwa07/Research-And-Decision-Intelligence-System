@@ -42,8 +42,8 @@ async def test_hypothesis_agent_fallback_generation():
 
 
 @pytest.mark.asyncio
-async def test_hypothesis_agent_enforces_3_to_7_items_boundary():
-    """Test hypothesis agent caps generated hypotheses to at most 7 items."""
+async def test_hypothesis_agent_returns_all_generated_hypotheses():
+    """Test hypothesis agent returns all generated hypotheses without artificial [:7] truncation."""
     agent = HypothesisAgent()
     
     # Mock LLM provider returning 10 hypotheses
@@ -66,8 +66,8 @@ async def test_hypothesis_agent_enforces_3_to_7_items_boundary():
     await agent.step({"query_text": "Sample Query"})
     output = await agent.compile_output()
 
-    # Must be capped to at most 7
-    assert len(output["hypotheses"]) == 7
+    # Must return all 10 generated hypotheses
+    assert len(output["hypotheses"]) == 10
 
 
 @pytest.mark.asyncio

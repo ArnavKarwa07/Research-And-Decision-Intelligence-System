@@ -9,6 +9,7 @@ import TerminalLogsModal from './TerminalLogsModal';
  */
 export default function AgentActivityTab({ steps = [], queryId = null, runId = null, isResearching = false }) {
   const [showLogsModal, setShowLogsModal] = useState(false);
+  const safeSteps = Array.isArray(steps) ? steps : [];
 
   return (
     <div className="space-y-6">
@@ -44,18 +45,22 @@ export default function AgentActivityTab({ steps = [], queryId = null, runId = n
       <div className="bg-surface-container-low border border-outline-variant/60 rounded-xl p-5 shadow-xl space-y-3">
         <h3 className="font-mono text-xs font-bold text-tertiary uppercase tracking-wider flex items-center gap-2">
           <span className="material-symbols-outlined text-sm">stream</span>
-          Real-Time Tool Invocation Audit Stream ({steps.length} EVENTS)
+          Real-Time Tool Invocation Audit Stream ({safeSteps.length} EVENTS)
         </h3>
 
         <div className="bg-surface p-4 rounded-lg border border-outline-variant max-h-60 overflow-y-auto space-y-2 font-mono text-xs">
-          {steps.length === 0 ? (
+          {safeSteps.filter(Boolean).length === 0 ? (
             <div className="text-on-surface-variant text-center py-4">No agent telemetry events recorded yet.</div>
           ) : (
-            steps.map((step, i) => (
-              <div key={step.id || i} className="flex justify-between items-center pb-1 border-b border-outline-variant/30">
-                <span className="text-cyber-cyan font-bold">[{step.agentType || 'Agent'}]</span>
-                <span className="text-on-surface flex-1 mx-3 truncate">{step.message}</span>
-                <span className="text-on-surface-variant text-[10px]">{step.timestamp ? new Date(step.timestamp).toLocaleTimeString() : 'Live'}</span>
+            safeSteps.filter(Boolean).map((step, i) => (
+              <div key={step?.id || i} className="flex justify-between items-center pb-1 border-b border-outline-variant/30">
+                <span className="text-cyber-cyan font-bold">[{step?.agentType || 'Agent'}]</span>
+                <span className="text-on-surface flex-1 mx-3 truncate">{step?.message}</span>
+                <span className="text-on-surface-variant text-[10px]">
+                  {step?.timestamp && !isNaN(new Date(step.timestamp).getTime())
+                    ? new Date(step.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                    : 'Live'}
+                </span>
               </div>
             ))
           )}
@@ -64,7 +69,7 @@ export default function AgentActivityTab({ steps = [], queryId = null, runId = n
 
       {/* Terminal Logs Modal */}
       {showLogsModal && (
-        <TerminalLogsModal steps={steps} onClose={() => setShowLogsModal(false)} />
+        <TerminalLogsModal steps={safeSteps} onClose={() => setShowLogsModal(false)} />
       )}
     </div>
   );

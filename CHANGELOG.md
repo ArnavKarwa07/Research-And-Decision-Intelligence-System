@@ -5,9 +5,105 @@ All notable changes to the Research And Decision Intelligence System (RADIS) wil
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] / [15.0.0] - RADIS Decision Engine Overhaul - 2026-09-05
+## [16.1.0] - Thread Persistence, Session Reload Restoration & Safe Database Migration - 2026-09-06
 
-### Added (RADIS Decision Engine Overhaul)
+### Fixed (Session History Persistence on Reload)
+- **Incremental Workflow State Persistence ([`query_service.py`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/services/query_service.py))**:
+  - Updated [`QueryService.execute_background_research`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/services/query_service.py) to persist execution state (`query.research_plan`, `query.summary`, `query.confidence`) incrementally on **every node completion** in the LangGraph streaming workflow rather than only upon final completion.
+  - Ensures partial execution plans, steps, evidence chains, and critique results are preserved even if network streams drop or workflows fail.
+- **Multi-Turn Query History Hydration ([`App.jsx`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/frontend/src/App.jsx) & [`ChatConversationView.jsx`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/frontend/src/components/ChatConversationView.jsx))**:
+  - Implemented multi-turn `queryHistory` state in [`App.jsx`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/frontend/src/App.jsx) fetching historical queries via [`api.getSessionQueries`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/frontend/src/lib/api.js) and rendering past conversational turns with [`SingleTurnView`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/frontend/src/components/ChatConversationView.jsx).
+  - Restores full context including prompt text, status badges, agent steps, evidence drawers, and decision matrices across page refreshes.
+- **Persistent Workspace Session Tracking ([`App.jsx`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/frontend/src/App.jsx))**:
+  - Preserves the active thread ID in `localStorage` (`radis_active_session_id`).
+  - Added direct fallback lookup [`api.getSession(savedActiveId)`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/frontend/src/lib/api.js) on initialization if the active session is outside the initial 50-item paginated page, preventing session loss.
+- **Fast-Path Session Timestamp Touch ([`query_service.py`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/services/query_service.py))**:
+  - Updated [`QueryService.run_research`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/services/query_service.py) to explicitly touch parent session timestamps using `session.updated_at = datetime.now(timezone.utc)` during Fast-Path quick queries, keeping workspace chronological ordering synchronized.
+
+### Fixed (Thread Deletion & Relational Cleanup)
+- **Accessible UI Delete Action ([`Sidebar.jsx`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/frontend/src/components/Sidebar.jsx))**:
+  - Fixed invalid nested HTML `<button>` hierarchy by refactoring session items into flex containers with dedicated selection and deletion buttons.
+  - Added `e.stopPropagation()`, accessible tooltips, `aria-label`, and keyboard focus styling (`focus:ring-1 focus:ring-error`) to prevent accidental thread activation when clicking delete.
+- **Safe Relational Bulk Deletion ([`session_service.py`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/services/session_service.py))**:
+  - Overhauled [`SessionService.delete_session`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/services/session_service.py) to perform bulk deletions in strict foreign-key dependency order:
+    1. `SourceGroupMember` referencing `SourceGroup` query IDs
+    2. `SourceGroup` records referencing query IDs
+    3. `Contradiction` records referencing query IDs
+    4. `ClaimSource` records referencing `Claim` query IDs
+    5. `Claim` records referencing query IDs
+    6. `Source` records referencing query IDs
+    7. Child records (`Evidence`, `CritiqueReport`, `Decision`, `Hypothesis`, `AgentRun`, `DataQueryRecord`, `VisualizationSpec`, `ReproducibleArtifact`, `Artifact`)
+    8. Session-level children (`MonitoringJob`, `ResearchBaselineSnapshot`, `ProjectMemoryItem`, `Document`, `Artifact`, `Query`)
+    9. The `Session` row itself.
+  - Prevents SQLite/PostgreSQL foreign key constraint failures and transaction rollbacks during thread removal.
+- **Session Switching on Deletion ([`App.jsx`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/frontend/src/App.jsx))**:
+  - Gracefully transitions active selection to the next available thread (`remaining[0]`) or resets to a blank workspace (`handleNewSession()`) if all sessions are deleted.
+
+### Fixed (React StrictMode Lifecycle & Concurrency Handling)
+- **Double-Mount Cancellation Guard ([`App.jsx`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/frontend/src/App.jsx))**:
+  - Added an `isSubscribed` lifecycle guard in workspace initialization `useEffect` to discard asynchronous resolution from unmounted instances during React 18+ development StrictMode double-mounting.
+- **Session Concurrency Refs (`loadingSessionIdRef` & `activeSessionIdRef`) ([`App.jsx`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/frontend/src/App.jsx))**:
+  - Guarded asynchronous session history loaders and live SSE stream handlers (`onStep`, `onEvidence`, `onClaim`, `onDecision`, `onComplete`, `onError`) with concurrency tokens, preventing stale responses from overwriting active thread views during rapid thread switching.
+- **Stale SSE Stream Failsafe ([`App.jsx`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/frontend/src/App.jsx))**:
+  - Introduced an 8-second failsafe timer (`staleTimer`) that resets `isResearching` state if no stream events are received for an older pending/running query.
+- **Initial Hydration Loading State ([`App.jsx`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/frontend/src/App.jsx))**:
+  - Added `isLoadingInitial` skeleton indicator preventing layout shift and input interactions while restoring workspace state.
+
+### Added (Database Column Migrations & SQLite Incremental Schema Updates)
+- **Automatic SQLite Incremental Column Migration ([`engine.py`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/db/engine.py))**:
+  - Implemented `_run_sqlite_column_migrations(conn)` inside database initialization ([`init_db`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/db/engine.py#L48)).
+  - Inspects existing table schema using `PRAGMA table_info(sources);` and automatically adds missing columns (`query_id`, `publisher`, `source_type`, `published_at`, `content_hash`, `independence_group`, `freshness_category`) via `ALTER TABLE` statements.
+  - Completely non-destructive: upgrades existing legacy database files (`radis.db`, `radis_dev.db`) on startup without table drops or data loss.
+- **SQL Session List Filtering & Cursor Validation ([`session_service.py`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/services/session_service.py))**:
+  - Filtered out abandoned default sessions (`title == "New Research Workspace"` or empty/null with 0 queries) while retaining user-titled sessions and active research threads.
+  - Added strict cursor parsing validation returning HTTP 400 Bad Request (`"Invalid cursor format"`) on malformed cursor strings.
+- **SSE Stream Error Handling ([`sse.js`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/frontend/src/lib/sse.js))**:
+  - Upgraded [`connectToStream`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/frontend/src/lib/sse.js) error extraction with `parseErrorData(event)` to cleanly extract error messages from JSON payloads, preventing stringification glitches (`[object Object]`).
+
+
+## [16.0.0] - Frontend & Backend Hardening, Search Relevance Overhaul & Dynamic Unconstrained Bounds - 2026-09-06
+
+### Added (Frontend Output Overhaul & Dynamic Mermaid Rendering - ISSUE-1)
+- **React Markdown Viewer (`MarkdownViewer.jsx`)**:
+  - Integrated `react-markdown` and `remark-gfm` in [`MarkdownViewer.jsx`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/frontend/src/components/MarkdownViewer.jsx) for rendering rich GitHub Flavored Markdown (GFM) content, responsive comparison tables, styled header hierarchies, blockquotes, code blocks, and inline citations.
+  - Added interactive client-side **Mermaid SVG Diagram Rendering** via [`MermaidBlock`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/frontend/src/components/MarkdownViewer.jsx#L24-L99) supporting dark theme customization (`mermaid.initialize`), clean DOM ID generation with `useId()`, and error boundary fallback to formatted raw code blocks.
+  - Seamlessly integrated [`MarkdownViewer`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/frontend/src/components/MarkdownViewer.jsx) into [`ChatConversationView.jsx`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/frontend/src/components/ChatConversationView.jsx) for dynamic streaming and final synthesis display.
+
+### Changed (Search Relevance Overhaul & Dynamic Bounds - ISSUE-2 & ISSUE-3)
+- **Search Relevance Overhaul ([`web_search.py`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/tools/web_search.py))**:
+  - Replaced rigid round-robin interleave distribution with term-overlap relevance scoring (`_calc_relevance`), evaluating title keyword matches ($3.0\times$), snippet keyword matches ($1.5\times$), exact phrase match bonuses ($+2.0$ title / $+1.0$ snippet), and quality content bonuses ($+0.5$).
+  - Implemented normalized URL deduplication (`seen_urls` set tracking normalized URLs stripped of trailing slashes and lowercased) across DuckDuckGo, Wikipedia, and arXiv candidates.
+  - Eliminated arbitrary arXiv capping and forced interleave skew, sorting all candidate results strictly by relevance score descending.
+- **Dynamic Unconstrained Bounds ([`hypothesis.py`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/agents/hypothesis.py) & [`graph.py`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/agents/graph.py))**:
+  - Removed artificial min/max limits on hypothesis generation and evidence snippet collection across backend agents.
+  - Dynamic bounds now scale naturally based on query complexity without clamping outputs to fixed min/max bounds.
+
+### Fixed (Adversarial Hardening & 16 Edge-Case Bug Fixes - ISSUE-4)
+- **`BUG-WS-01`**: Sanitized empty string or whitespace-only search queries in [`web_search.py`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/tools/web_search.py).
+- **`BUG-WS-02`**: Handled `None` attributes (url, title, snippet) in `WebSearchResult` objects safely during scoring and serialization.
+- **`BUG-HYP-01`**: Standardized `model_dump()` serialization across Pydantic and dictionary hypothesis objects in [`hypothesis.py`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/agents/hypothesis.py).
+- **`BUG-HYP-02`**: Protected step condition checks against `None` or empty hypothesis lists in [`hypothesis.py`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/agents/hypothesis.py).
+- **`BUG-GR-01`**: Added null-checks and default alternative fallback objects for `decision_matrix=None` in [`graph.py`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/agents/graph.py) `decision_node`.
+- **`BUG-GR-02`**: Guarded `provenance_node` and `evidence_node` against missing/None source attributes and null snippet content.
+- **`BUG-GR-03`**: Handled non-dict elements in `alternatives` list inside `synthesis_node` in [`graph.py`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/agents/graph.py).
+- **`BUG-CR-01`**: Provided safe default fallbacks for `None` inputs (`synthesis`, `claims`, `evidence_chain`, `hypotheses`) in [`critic.py`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/agents/critic.py).
+- **`BUG-CR-02`**: Normalized claim objects in `_audit_bias` in [`critic.py`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/agents/critic.py) to support both Pydantic models and dictionaries.
+- **`BUG-GR-04`**: Ensured `steps` and `current_step` state updates safely handle `None` step lists across all graph nodes in [`graph.py`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/agents/graph.py).
+- **`BUG-FE-01`**: Resolved object-based `currentQuery` parsing errors in [`ChatConversationView.jsx`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/frontend/src/components/ChatConversationView.jsx).
+- **`BUG-FE-02`**: Enforced `Array.isArray` fallback defaults for non-array props (`steps`, `evidence`, `claims`) in [`ChatConversationView.jsx`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/frontend/src/components/ChatConversationView.jsx).
+- **`BUG-FE-03`**: Prevented React render lifecycle crashes on `null` or whitespace markdown content in [`MarkdownViewer.jsx`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/frontend/src/components/MarkdownViewer.jsx).
+- **`BUG-FE-04`**: Sanitized React `useId()` strings for DOM element ID compliance and introduced rendering error boundaries in [`MermaidBlock`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/frontend/src/components/MarkdownViewer.jsx#L24-L99).
+- **`BUG-FE-05`**: Added horizontal scroll wrapper styling for GFM tables and code blocks in [`MarkdownViewer.jsx`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/frontend/src/components/MarkdownViewer.jsx).
+- **`BUG-LLM-01`**: Standardized fallback error handling and token usage calculation in [`llm_provider.py`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/agents/llm_provider.py).
+
+## [15.0.0] - RADIS Decision Engine Overhaul - 2026-09-05
+
+### Added (RADIS Decision Engine & Multi-Agent Execution Prompt Overhaul)
+- **RADIS Multi-Agent Execution Prompt Overhaul**:
+  - **Executive Synthesis Agent Dynamic Report Capabilities**: Enforced dynamic report synthesis equipped with Multi-vector strategy comparison tables (evaluating trade-offs, feasibility, cost, and risk across strategic pathways), native Mermaid sequence/flowcharts, failure mode playbooks with root-cause mitigations, quantitative tipping-point rules (metric tripwires), and inline citation anchoring (`[Doc: X, Page: Y]`, `[Source: URL]`).
+  - **Supervisor & Fact Check Agent Source Diversity & Claim Provenance Mapping**: Enforced strict source diversity controls (capping arXiv academic literature at $\le 2$ items and interleaving round-robin across live web, news, Wikipedia, arXiv, and RAG vector search) and atomic claim provenance mapping connecting claims to verified evidence chains.
+  - **Red-Team Critic Auditor XML Tag Shielding & Jargon Leak Verification**: Integrated mandatory `<retrieved_snippets>` and `<untrusted_content>` XML boundary shielding against prompt injections, alongside automated jargon leak verification scanning for and purging legacy corporate boilerplate defaults.
+  - **Rotational LLM Provider Candidate Failover Sequence**: Standardized model failover sequence: `gemini-flash-latest` $\rightarrow$ `gemini-flash-lite-latest` $\rightarrow$ `gemini-1.5-flash` $\rightarrow$ `gemma-2-27b-it` $\rightarrow$ `gemma-2-9b-it` in [`llm_provider.py`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/agents/llm_provider.py) and [`graph.py`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/agents/graph.py) handling HTTP 429 rate limits, 503 unavailability, 404 missing model errors, and quota exhaustion.
 - **Rotational LLM Provider & Dynamic Error Failover (`RotationalGeminiProvider`, `RotationalChatGoogleGenerativeAI`)**:
   - Implemented automatic model rotation across candidate list `["gemini-flash-latest", "gemini-flash-lite-latest", "gemini-1.5-flash", "gemma-2-27b-it", "gemma-2-9b-it"]` in [`llm_provider.py`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/agents/llm_provider.py) and [`graph.py`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/agents/graph.py).
   - Handles API rate limits (HTTP 429), service unavailability (503), model missing errors (404), and quota exhaustion by dynamically failing over to the next candidate model without crashing research workflows.

@@ -1,5 +1,5 @@
 """Hypothesis Agent implementation for RADIS.
-Decomposes research queries into 3-7 competing, falsifiable hypotheses.
+Decomposes research queries into competing, falsifiable hypotheses.
 """
 import logging
 import uuid
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class HypothesisAgent(BaseAgent):
-    """Hypothesis Agent generates 3-7 competing, falsifiable hypotheses for a research query."""
+    """Hypothesis Agent generates competing, falsifiable hypotheses for a research query."""
 
     def __init__(self, config: AgentConfig | None = None):
         if config is None:
@@ -48,7 +48,7 @@ class HypothesisAgent(BaseAgent):
             try:
                 system_prompt = (
                     "You are a Specialist Hypothesis Generation Agent in a decision intelligence system. "
-                    "Given a research query and context, generate between 3 and 7 distinct, competing, "
+                    "Given a research query and context, generate distinct, competing, "
                     "and mutually falsifiable hypotheses. Provide an initial confidence score [0.0 - 1.0] "
                     "for each and list discriminating evidence needed to evaluate them."
                 )
@@ -62,7 +62,7 @@ class HypothesisAgent(BaseAgent):
                     Message(role="user", content=user_content)
                 ]
                 res = await self._llm_provider.generate_structured(messages, HypothesisAgentOutput)
-                if isinstance(res, HypothesisAgentOutput) and len(res.hypotheses) >= 1:
+                if isinstance(res, HypothesisAgentOutput) and res.hypotheses and len(res.hypotheses) >= 1:
                     generated_output = res
                     tokens_used = 500
             except Exception as e:
@@ -113,8 +113,8 @@ class HypothesisAgent(BaseAgent):
                 investigation_priorities=fallback_priorities
             )
 
-        # Enforce 3 to 7 items boundary
-        self.hypotheses = generated_output.hypotheses[:7]
+        # Allow returning all generated hypotheses naturally produced
+        self.hypotheses = generated_output.hypotheses
         self.investigation_priorities = generated_output.investigation_priorities or [
             "Gather disconfirming evidence for top hypothesis",
             "Perform cross-validation across competing hypotheses"
@@ -122,7 +122,7 @@ class HypothesisAgent(BaseAgent):
 
         result_dict = {
             "hypotheses_count": len(self.hypotheses),
-            "hypotheses": [h.model_dump() for h in self.hypotheses],
+            "hypotheses": [h.model_dump() if hasattr(h, "model_dump") else h for h in self.hypotheses],
             "investigation_priorities": self.investigation_priorities
         }
 

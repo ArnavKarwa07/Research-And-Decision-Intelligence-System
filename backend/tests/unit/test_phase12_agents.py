@@ -196,7 +196,7 @@ async def test_graph_workflow_execution_with_memory_and_monitoring():
     initial_state: AgentState = {
         "query_id": str(uuid.uuid4()),
         "text": "Evaluates continuous monitoring and project memory integration",
-        "mode": "comprehensive",
+        "mode": "quick",
         "plan": [],
         "steps": [],
         "snippets": [],

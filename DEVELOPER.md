@@ -102,6 +102,32 @@ RADIS features a unified multi-provider LLM orchestration tier supporting **Goog
      - Formulates query topic-grounded option titles (e.g., `Accelerated Domain Implementation for {topic_phrase}`) rather than mechanically concatenating titles or relying on static boilerplate templates.
    - Eliminates generic corporate jargon defaults (e.g. legacy lithography/fabrication templates) in favor of dynamic, query-tailored strategic matrices.
 
+## RADIS Multi-Agent Execution Prompt Overhaul Architecture
+
+The RADIS multi-agent prompt architecture standardizes agent system prompts, dynamic report generation, source balance controls, prompt injection shielding, jargon verification, and rotational model failovers across all agents.
+
+### 1. Executive Synthesis Agent Dynamic Report Capabilities
+The Executive Synthesis Agent ([`synthesis.py`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/agents/synthesis.py)) generates structured executive decision reports equipped with:
+- **Multi-Vector Strategy Comparison Tables**: Comprehensive Markdown comparison matrices evaluating competing strategic pathways across trade-off dimensions (feasibility, financial impact, operational complexity, risk profile, and time-to-value).
+- **Mermaid Sequence & Flowcharts**: Native Mermaid syntax rendering visual process flows, architecture diagrams, sequence maps, and execution timelines.
+- **Failure Mode Playbooks**: Structured failure risk analysis detailing potential breakdown scenarios, root-cause triggers, severity ratings, and pre-planned operational mitigation protocols.
+- **Tipping-Point Rules**: Quantitative tripwires establishing clear threshold metrics (e.g. cost drift $> 15\%$, latency $> 500\text{ms}$) that trigger strategy re-evaluation or recommendation pivots.
+- **Inline Citation Anchoring**: Precise citation tags (`[Doc: filename, Page: X]`, `[Source: URL]`) anchored directly to verified evidence items and RAG payload chunks.
+
+### 2. Supervisor & Fact Check Agent Source Diversity & Claim Provenance Mapping
+- **Source Diversity Enforcement**: Prevents single-source or academic bias by enforcing distribution caps ($\le 2$ arXiv items) and round-robin interleaving across live web scrapers, Wikipedia REST API, arXiv API, news/market fallbacks, and Qdrant RAG vector storage.
+- **Claim Provenance Mapping**: Tracks atomic claims from initial extraction to source verification. Maps claim lineage across 7 taxonomy types (`FACT`, `CALCULATION`, `INFERENCE`, `ASSUMPTION`, `PREDICTION`, `OPINION`, `UNRESOLVED`), maintaining explicit links between claims, source payloads, and confidence scores.
+
+### 3. Red-Team Critic Auditor XML Tag Shielding & Jargon Leak Verification
+- **XML Tag Shielding (`<retrieved_snippets>` & `<untrusted_content>`)**: All untrusted external search results, scraped web text, and RAG context blocks are strictly encapsulated inside `<retrieved_snippets>` or `<untrusted_content>` XML boundaries prior to prompt injection into agent context windows.
+- **Jargon Leak Verification**: Automated inspection scans generated report content to verify the complete absence of legacy corporate boilerplate (e.g., hardcoded "lithography", "regional buffer architecture", or static framework templates). Replaces canned defaults with dynamic, query-tailored strategic options.
+
+### 4. Rotational LLM Provider Candidate Failover Sequence
+The LLM Provider layer (`RotationalGeminiProvider`, `RotationalChatGoogleGenerativeAI` in [`llm_provider.py`](file:///c:/Users/user/OneDrive/Desktop/CODE/Research-And-Decision-Intelligence-System/backend/app/agents/llm_provider.py)) implements a deterministic rotational candidate failover sequence:
+$$\text{gemini-flash-latest} \longrightarrow \text{gemini-flash-lite-latest} \longrightarrow \text{gemini-1.5-flash} \longrightarrow \text{gemma-2-27b-it} \longrightarrow \text{gemma-2-9b-it}$$
+- **Failover Triggers**: Intercepts HTTP 429 (Rate Limit / Resource Exhausted), HTTP 503 (Service Unavailable), HTTP 404 (Model Not Found / Endpoint Missing), HTTP 400 (Invalid Argument), and quota exhaustion.
+- **Stateful Candidate Index Rotation**: On catching a rotatable error, the provider logs a warning, advances the candidate model index modulo the candidate list length, and retries the request seamlessly without disrupting active graph execution or dropping task state.
+
 ## Agent Engineering Rules
 
 RADIS employs a strict set of rules for agent development to ensure reliability, predictability, and safety:

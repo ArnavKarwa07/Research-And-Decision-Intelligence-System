@@ -11,14 +11,28 @@ from app.services.worker_pool import global_worker_pool
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Lifespan event handler for the FastAPI app."""
-    # Initialize DB on startup
-    await init_db()
-    # Start worker pool on startup
-    await global_worker_pool.start()
-    app.state.worker_pool = global_worker_pool
+    try:
+        # Initialize DB on startup
+        await init_db()
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Database initialization warning in lifespan: {e}")
+
+    try:
+        # Start worker pool on startup
+        await global_worker_pool.start()
+        app.state.worker_pool = global_worker_pool
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Worker pool startup warning in lifespan: {e}")
+
     yield
-    # Stop worker pool on shutdown
-    await global_worker_pool.stop()
+
+    try:
+        # Stop worker pool on shutdown
+        await global_worker_pool.stop()
+    except Exception as e:
+        pass
 
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
@@ -33,7 +47,8 @@ def create_app() -> FastAPI:
     cors_origins = list(settings.cors_origins) + ["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:3000"]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=cors_origins,
+        allow_origins=["*"] if settings.cors_origins == ["*"] else cors_origins,
+        allow_origin_regex=r"https://.*\.vercel\.app",
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

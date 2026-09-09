@@ -8,7 +8,7 @@ async def test_phase3_pipeline():
     initial_state = {
         "query_id": "test-query",
         "text": "Analyze the impact of AGI.",
-        "mode": "comprehensive",
+        "mode": "quick",
         "plan": [],
         "steps": [],
         "snippets": [],

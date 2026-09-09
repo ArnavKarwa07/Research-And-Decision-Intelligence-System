@@ -1,4 +1,4 @@
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api/v1';
+const BASE_URL = import.meta.env.VITE_API_URL || '/api/v1';
 
 async function fetchApi(endpoint, options = {}) {
   const url = `${BASE_URL}${endpoint}`;
@@ -12,7 +12,13 @@ async function fetchApi(endpoint, options = {}) {
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({ detail: response.statusText }));
-    throw new Error(errorData.detail || `API Error: ${response.status}`);
+    let message = errorData.detail;
+    if (Array.isArray(message)) {
+      message = message.map((item) => item.msg || JSON.stringify(item)).join('; ');
+    } else if (typeof message === 'object' && message !== null) {
+      message = JSON.stringify(message);
+    }
+    throw new Error(message || `API Error: ${response.status}`);
   }
 
   if (response.status === 204) {
@@ -26,7 +32,7 @@ export const api = {
   createSession: (data = { title: 'New Research' }) => 
     fetchApi('/sessions/', { method: 'POST', body: JSON.stringify(data) }),
 
-  getSessions: (limit = 20, cursor = null) => {
+  getSessions: (limit = 50, cursor = null) => {
     const query = new URLSearchParams({ limit });
     if (cursor) query.append('cursor', cursor);
     return fetchApi(`/sessions/?${query.toString()}`);

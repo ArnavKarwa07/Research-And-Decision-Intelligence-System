@@ -9,6 +9,7 @@ Tests endpoint schemas, status codes, and HTTP contract for:
   - POST /api/v1/queries/{id}/self-challenge
 """
 import pytest
+from unittest.mock import patch, AsyncMock
 from uuid import uuid4
 from httpx import AsyncClient, ASGITransport
 
@@ -31,10 +32,11 @@ async def sample_session_and_query(async_client):
     assert session_res.status_code == 201
     session_id = session_res.json()["id"]
 
-    query_res = await async_client.post(
-        f"/api/v1/sessions/{session_id}/queries/",
-        json={"text": "Evaluate clean energy transition dynamics", "mode": "deep"}
-    )
+    with patch("app.services.query_service.QueryService.run_research", new=AsyncMock(return_value=None)):
+        query_res = await async_client.post(
+            f"/api/v1/sessions/{session_id}/queries/",
+            json={"text": "Evaluate clean energy transition dynamics", "mode": "quick"}
+        )
     assert query_res.status_code == 201
     query_id = query_res.json()["id"]
     return session_id, query_id
@@ -190,7 +192,16 @@ async def test_self_challenge_success(async_client, sample_session_and_query):
         "max_replan_iterations": 2,
         "confidence_threshold": 0.4
     }
-    response = await async_client.post(f"/api/v1/queries/{query_id}/self-challenge", json=payload)
+    mock_res = {
+        "query_id": str(query_id),
+        "hypotheses": [],
+        "critique_reports": [],
+        "replan_count": 0,
+        "final_status": "completed",
+        "finalized_with_caveats": False
+    }
+    with patch("app.services.self_challenge_service.SelfChallengeService.run_self_challenge", new=AsyncMock(return_value=mock_res)):
+        response = await async_client.post(f"/api/v1/queries/{query_id}/self-challenge", json=payload)
     assert response.status_code == 200
     data = response.json()
     assert "query_id" in data

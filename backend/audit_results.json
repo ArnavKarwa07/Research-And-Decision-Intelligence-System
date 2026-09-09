@@ -1,0 +1,65 @@
+[
+  {
+    "id": "BUG-01",
+    "title": "DDG Lite 202/403 Failure Causes Source Distribution Skew (100% arXiv / Wikipedia)",
+    "severity": "CRITICAL",
+    "category": "Source Distribution Skew & Exception Handling",
+    "description": "DDG Lite returns HTTP 202/403 for automated requests. _duckduckgo_search catches this and silently returns []. Because WebSearchTool.search() requires len(combined) < 2 to trigger fallback web/news items, when Wikipedia or arXiv return >= 2 items, fallback web/news sources are skipped, resulting in 100% arXiv/Wikipedia results without live web/news data.",
+    "repro_steps": "Run WebSearchTool().search(WebSearchInput(query='arXiv 2110.01831 logicist emergentist'))",
+    "empirical_log": "Returned 2 results: 0 web/news, 0 wikipedia, 2 arxiv. URLs: ['http://arxiv.org/abs/1304.1836v2', 'http://arxiv.org/abs/1005.0280v6']"
+  },
+  {
+    "id": "BUG-02",
+    "title": "Configuration Key Name Mismatch Between config.py and web_search.py",
+    "severity": "MINOR",
+    "category": "Schema/Type Mismatch",
+    "description": "config.py defines google_search_api_key and google_search_engine_id, but WebSearchTool reads GEMINI_API_KEY and GOOGLE_CX directly from os.environ.",
+    "repro_steps": "Inspect web_search.py __init__ vs app/config.py Settings fields.",
+    "empirical_log": "config.py defines google_search_api_key and google_search_engine_id, but WebSearchTool reads GEMINI_API_KEY and GOOGLE_CX directly from os.environ."
+  },
+  {
+    "id": "BUG-03",
+    "title": "MockProvider.generate_structured() Crashes on Pydantic Models with List Fields",
+    "severity": "MAJOR",
+    "category": "Schema / Type Error",
+    "description": "MockProvider.generate_structured checks `f.annotation == list` which evaluates to False for typing origins like `list[AlternativeOption]` or `List[str]`. Consequently, required list fields are assigned `None`, triggering a Pydantic ValidationError.",
+    "repro_steps": "Run MockProvider().generate_structured([Message(role='user', content='test')], DecisionMatrix)",
+    "empirical_log": "ValidationError: 4 validation errors for DecisionMatrix\nalternatives\n  Input should be a valid list [type=list_type, input_value=None, input_type=NoneType]\n    For further information visit https://errors.pydantic.dev/2.12/v/list_type\nkey_risks\n  Input should be a valid list [type=list_type, input_value=None, input_type=NoneType]\n    For further information visit https://errors.pydantic.dev/2.12/v/list_type\nassumptions\n  Input should be a valid list [type=list_type, input_value=None, input_type=NoneType]\n    For further information visit https://errors.pydantic.dev/2.12/v/list_type\ndecision_triggers\n  Input should be a valid list [type=list_type, input_value=None, input_type=NoneType]\n    For further information visit https://errors.pydantic.dev/2.12/v/list_type"
+  },
+  {
+    "id": "BUG-04",
+    "title": "graph.py synthesis_node Crashes on Single Alternative LLM Output (IndexError / KeyError)",
+    "severity": "CRITICAL",
+    "category": "LLM JSON Extraction & Unhandled Exception",
+    "description": "In graph.py synthesis_node, lines 683-684 hardcode references to `alternatives[0]` and `alternatives[1]`. If the LLM generates a JSON code block with 1 alternative option, or uses alternate key names (e.g. `title` instead of `name`), the node crashes with an unhandled IndexError or KeyError.",
+    "repro_steps": "Pass an LLM response containing a single JSON alternative to synthesis_node.",
+    "empirical_log": "IndexError: list index out of range"
+  },
+  {
+    "id": "BUG-05",
+    "title": "Leftover Hardcoded Domain Templates ('React', 'Next.js') in synthesis.py",
+    "severity": "MAJOR",
+    "category": "Leftover Mock/Template Data",
+    "description": "synthesis.py contains hardcoded conditional branches injecting 'React Component Architecture Strategy', 'Full-Stack React & Next.js Ecosystem Path', and 'React + TypeScript Enterprise Standard Path' whenever the objective or claims mention 'react', regardless of actual decision context.",
+    "repro_steps": "Inspect app/agents/synthesis.py lines 123-142.",
+    "empirical_log": "Found 'Core React Component Architecture Strategy' and 'Full-Stack React & Next.js Ecosystem Path' hardcoded in synthesis.py"
+  },
+  {
+    "id": "BUG-06",
+    "title": "Stubbed Nodes in graph.py (Retrieval Node Mocking, Fact Check Hardcoding, Blank Contradiction Node)",
+    "severity": "MAJOR",
+    "category": "Leftover Mock/Template Data & Stubbed Architecture",
+    "description": "graph.py contains dummy hardcoded implementations: retrieval_node returns static mock chunk 'doc-internal-ref-001' without querying Qdrant RAG store; fact_check_node marks all claims as verified: True with 0.95 confidence without verification; contradiction_node always sets contradictions = [].",
+    "repro_steps": "Inspect app/agents/graph.py retrieval_node, fact_check_node, and contradiction_node.",
+    "empirical_log": "Found hardcoded mock chunk 'doc-internal-ref-001' in retrieval_node and static verified=True in fact_check_node."
+  },
+  {
+    "id": "BUG-07",
+    "title": "Prompt Injection Vulnerability in graph.py synthesis_node via Unsanitized External Web Snippets",
+    "severity": "MAJOR",
+    "category": "Security & Prompt Injection",
+    "description": "In graph.py synthesis_node (lines 578-612), raw external web search snippets are directly formatted into the LLM prompt (`{snippets_text}`) without XML boundary delimiters (e.g. `<retrieved_snippets>`), escaping, or prompt injection sanitization. Adversarial web content can manipulate the LLM into disregarding instructions or outputting unauthorized text.",
+    "repro_steps": "Retrieve web content containing prompt injection instructions and pass to synthesis_node.",
+    "empirical_log": "Unsanitized string interpolation of snippet text directly into LLM system prompt."
+  }
+]

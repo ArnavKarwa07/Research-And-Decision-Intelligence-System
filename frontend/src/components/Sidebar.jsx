@@ -48,35 +48,37 @@ export default function Sidebar({
             sessions.map((s) => {
               const isSelected = s.id === activeSessionId;
               return (
-                <button
+                <div
                   key={s.id}
-                  type="button"
-                  onClick={() => onSelectSession(s.id)}
-                  className={`group w-full text-left px-3 py-2 rounded-md transition-all text-xs flex items-center justify-between font-medium cursor-pointer ${
+                  className={`group w-full rounded-md transition-all text-xs flex items-center justify-between font-medium ${
                     isSelected
-                      ? 'bg-surface-container-high text-primary font-bold border border-outline-variant'
+                      ? 'bg-surface-container-high text-primary font-bold border border-outline-variant shadow-sm'
                       : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container/40'
                   }`}
                 >
-                  <div className="flex items-center gap-2 truncate flex-1 min-w-0">
+                  <button
+                    type="button"
+                    onClick={() => onSelectSession(s.id)}
+                    className="flex items-center gap-2 truncate flex-1 min-w-0 text-left px-3 py-2 cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary rounded-l-md"
+                  >
                     <span className="material-symbols-outlined text-xs text-outline shrink-0">forum</span>
                     <span className="truncate">{s.title || 'Untitled Task'}</span>
-                  </div>
+                  </button>
                   {onDeleteSession && (
-                    <span
-                      role="button"
-                      tabIndex={0}
+                    <button
+                      type="button"
                       title="Delete thread"
+                      aria-label={`Delete thread ${s.title || 'Untitled Task'}`}
                       onClick={(e) => {
                         e.stopPropagation();
                         onDeleteSession(s.id);
                       }}
-                      className="opacity-0 group-hover:opacity-100 p-1 text-on-surface-variant hover:text-error hover:bg-surface-container-highest rounded transition-all shrink-0 ml-1 cursor-pointer flex items-center justify-center"
+                      className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus:opacity-100 p-1.5 mr-1.5 text-on-surface-variant hover:text-error hover:bg-surface-container-highest rounded transition-all shrink-0 cursor-pointer flex items-center justify-center focus:outline-none focus:ring-1 focus:ring-error"
                     >
                       <span className="material-symbols-outlined text-xs leading-none">delete</span>
-                    </span>
+                    </button>
                   )}
-                </button>
+                </div>
               );
             })
           )}

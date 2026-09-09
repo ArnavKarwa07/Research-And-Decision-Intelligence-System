@@ -1,6 +1,7 @@
 import asyncio
 import httpx
 import json
+import pytest
 
 BASE_URL = "http://127.0.0.1:8000/api/v1"
 
@@ -8,7 +9,10 @@ async def test_end_to_end():
     async with httpx.AsyncClient(timeout=60.0) as client:
         # 1. Create Session
         print("1. Creating session...")
-        res = await client.post(f"{BASE_URL}/sessions/", json={"title": "End-to-End Multi-Agent Test"})
+        try:
+            res = await client.post(f"{BASE_URL}/sessions/", json={"title": "End-to-End Multi-Agent Test"})
+        except (httpx.ConnectError, httpx.ConnectTimeout):
+            pytest.skip("Backend server is not running at http://127.0.0.1:8000")
         assert res.status_code == 201, f"Failed session creation: {res.text}"
         session_id = res.json()["id"]
         print(f"   Session created: {session_id}")

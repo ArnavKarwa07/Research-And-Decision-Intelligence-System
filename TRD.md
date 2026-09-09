@@ -234,6 +234,28 @@ Compares alternatives and produces recommendations under uncertainty.
 
 Produces the user-facing result with citations, assumptions, uncertainty, and next steps.
 
+## 7.1 RADIS Multi-Agent Prompt Overhaul & Failover Specifications
+
+### 1. Executive Synthesis Agent Dynamic Report Capabilities
+- **Multi-Vector Strategy Comparison Tables**: Generates detailed Markdown tables comparing alternative strategic options across trade-off dimensions (feasibility, cost, operational complexity, risk profile, time-to-value).
+- **Mermaid Sequence & Flowcharts**: Generates native Mermaid code blocks visualizing execution workflows, sequence diagrams, and architecture dependency maps.
+- **Failure Mode Playbooks**: Provides explicit failure risk analysis specifying root-cause triggers, severity levels, and pre-planned operational mitigation playbooks.
+- **Tipping-Point Rules**: Establishes quantitative metric tripwires (e.g. latency $> 500\text{ms}$, budget drift $> 15\%$) that mandate recommendation pivots or re-evaluation.
+- **Inline Citation Anchoring**: Enforces direct citation links (`[Doc: filename, Page: X]`, `[Source: URL]`) anchoring every key assertion to verified evidence payloads and RAG chunks.
+
+### 2. Supervisor & Fact Check Agent Source Diversity & Claim Provenance Mapping
+- **Source Diversity Enforcement**: Enforces distribution balance by capping academic preprints (arXiv) at $\le 2$ items and interleaving round-robin across live web search, Wikipedia REST API, arXiv API, curated news fallbacks, and Qdrant RAG vector store.
+- **Claim Provenance Mapping**: Maintains end-to-end lineage mapping for atomic claims across 7 taxonomy types (`FACT`, `CALCULATION`, `INFERENCE`, `ASSUMPTION`, `PREDICTION`, `OPINION`, `UNRESOLVED`), linking claims directly to verified source payloads and confidence scores.
+
+### 3. Red-Team Critic Auditor XML Tag Shielding & Jargon Leak Verification
+- **XML Tag Shielding**: Encapsulates external web search snippets and RAG context blocks in `<retrieved_snippets>` and `<untrusted_content>` XML boundaries to neutralize prompt injection attacks.
+- **Jargon Leak Verification**: Automated inspection scans synthesized outputs to purge legacy corporate boilerplate (e.g. static "lithography", "regional buffer" templates), replacing them with query-tailored strategic options.
+
+### 4. Rotational LLM Provider Candidate Failover Sequence
+- **Candidate Chain**: Rotates model execution sequentially through:
+  $$\text{gemini-flash-latest} \longrightarrow \text{gemini-flash-lite-latest} \longrightarrow \text{gemini-1.5-flash} \longrightarrow \text{gemma-2-27b-it} \longrightarrow \text{gemma-2-9b-it}$$
+- **Failover Handling**: Catches HTTP 429 (Rate Limit / Quota Exceeded), HTTP 503 (Service Unavailable), HTTP 404 (Model Endpoint Not Found), and HTTP 400 (Invalid Argument), automatically advancing candidate index without crashing active graph workflows.
+
 ## 8. Dynamic Orchestration
 
 The orchestrator must support:
@@ -414,7 +436,7 @@ run.failed
 - Dead-letter handling for failed background tasks
 - Timeouts on all remote calls
 - Backpressure for expensive research
-- Circuit breakers for unstable providers
+- Circuit breakers & rotational model candidate failover sequence for unstable providers (`gemini-flash-latest` $\rightarrow$ `gemini-flash-lite-latest` $\rightarrow$ `gemini-1.5-flash` $\rightarrow$ `gemma-2-27b-it` $\rightarrow$ `gemma-2-9b-it`) handling HTTP 429 rate limits, 503 unavailability, 404 missing model endpoints, and quota exhaustion.
 
 ## 18. Performance Targets
 
