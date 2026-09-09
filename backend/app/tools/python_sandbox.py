@@ -6,8 +6,6 @@ import sys
 import time
 import logging
 from typing import Any, Dict, List, Optional
-import pandas as pd
-import numpy as np
 
 from app.schemas.data_analysis import PythonAnalysisResponse, StatisticalSummary
 
@@ -74,8 +72,14 @@ class PythonSandboxTool:
             return f"Sandbox Security Violation: {'; '.join(checker.errors)}"
         return None
 
-    def calculate_statistical_summary(self, df: pd.DataFrame) -> Optional[StatisticalSummary]:
+    def calculate_statistical_summary(self, df: Any) -> Optional[StatisticalSummary]:
         """Calculates statistical summary metrics for numeric columns in DataFrame."""
+        try:
+            import pandas as pd
+            import numpy as np
+        except ImportError:
+            return None
+
         numeric_cols = df.select_dtypes(include=[np.number]).columns
         if len(numeric_cols) == 0:
             return None
@@ -149,7 +153,15 @@ class PythonSandboxTool:
             return __import__(name, globals, locals, fromlist, level)
 
         # Prepare safe execution global scope
-        df = pd.DataFrame(input_data) if input_data else pd.DataFrame()
+        try:
+            import pandas as pd
+            import numpy as np
+            df = pd.DataFrame(input_data) if input_data else pd.DataFrame()
+        except ImportError:
+            pd = None
+            np = None
+            df = input_data or []
+
         safe_globals = {
             "pd": pd,
             "np": np,

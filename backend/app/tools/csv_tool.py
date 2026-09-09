@@ -2,8 +2,6 @@
 import os
 import re
 import sqlite3
-import pandas as pd
-import numpy as np
 import logging
 from typing import Any, Dict, List, Tuple, Optional
 from app.schemas.data_analysis import DatasetProfileResponse, TableColumnInfo
@@ -24,8 +22,9 @@ class CSVTool:
             clean = f"col_{clean}"
         return clean.lower()
 
-    def parse_file(self, file_path: str) -> Tuple[pd.DataFrame, str]:
+    def parse_file(self, file_path: str) -> Tuple[Any, str]:
         """Loads a CSV or Excel file into a pandas DataFrame."""
+        import pandas as pd
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"File not found: {file_path}")
 
@@ -43,7 +42,7 @@ class CSVTool:
         df.columns = [self.sanitize_identifier(col) for col in df.columns]
         return df, file_type
 
-    def ingest_to_sqlite(self, file_path: str, custom_table_name: Optional[str] = None) -> Tuple[str, pd.DataFrame]:
+    def ingest_to_sqlite(self, file_path: str, custom_table_name: Optional[str] = None) -> Tuple[str, Any]:
         """Ingests CSV/Excel file into SQLite database table."""
         df, file_type = self.parse_file(file_path)
         base_name = os.path.splitext(os.path.basename(file_path))[0]
@@ -56,8 +55,10 @@ class CSVTool:
 
         return table_name, df
 
-    def profile_dataframe(self, df: pd.DataFrame, table_name: str, filename: str, file_type: str) -> DatasetProfileResponse:
+    def profile_dataframe(self, df: Any, table_name: str, filename: str, file_type: str) -> DatasetProfileResponse:
         """Generates comprehensive summary profile of a tabular dataset."""
+        import pandas as pd
+        import numpy as np
         columns_info = []
         summary_stats = {}
 
